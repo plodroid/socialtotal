@@ -3,6 +3,7 @@
 
   var CONFIG=Object.assign({
     adsenseClient:'',
+    autoAds:true,
     adSlots:{top:'',left:'',right:'',inline1:'',inline2:'',footer:''}
   },window.DROPIMAGE_CONFIG||{});
 
@@ -544,7 +545,10 @@
     $$('[data-ad-key]').forEach(function(container){
       var key=container.getAttribute('data-ad-key');
       var slot=CONFIG.adSlots&&String(CONFIG.adSlots[key]||'').trim();
-      if(!slot)return;
+      if(!slot){
+        if(CONFIG.autoAds)container.classList.add('hidden');
+        return;
+      }
       container.innerHTML='<span class="ad-label">Advertisement</span>';
       var ad=document.createElement('ins');
       ad.className='adsbygoogle';

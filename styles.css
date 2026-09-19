@@ -224,7 +224,7 @@ svg{display:block}
 .ad-label{padding:4px 6px;border:1px solid var(--line);border-radius:7px;color:var(--soft);font-size:.57rem;text-transform:uppercase;letter-spacing:.08em}
 .ad-demo-copy{display:grid;gap:3px}
 .ad-demo-copy b{font-size:.77rem}
-.ad-demo-copy span{color:var(--soft);font-size:.66rem}
+.ad-demo-copy span{color:var(--soft);font-size:.66rem}\n.adsbygoogle{display:block;min-width:0;min-height:60px;flex:1}
 
 /* create */
 .composer-layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;align-items:start}

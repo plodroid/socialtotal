@@ -1,103 +1,26 @@
 (function(){
   'use strict';
 
-  var CONFIG = Object.assign({
-    googleClientId:'',
-    tiktokClientKey:'',
-    backendBaseUrl:'',
-    discordClientId:'',
+  var CONFIG=Object.assign({
     adsenseClient:'',
-    adsenseSlot:'',
-    demoMode:true
-  }, window.SOCIALTOTAL_CONFIG || {});
+    adSlots:{top:'',left:'',right:'',inline1:'',inline2:'',footer:''}
+  },window.DROPIMAGE_CONFIG||{});
 
-  var STORAGE_KEY = 'socialtotal_demo_v1';
-  var platformOrder = ['youtube','tiktok','instagram','facebook'];
-  var platforms = {
-    youtube:{
-      name:'YouTube', short:'YT',
-      permissions:[
-        ['See your YouTube channel','Used to show which channel is connected.'],
-        ['Upload videos you choose','SocialTotal only uploads after you press Publish.']
-      ]
-    },
-    tiktok:{
-      name:'TikTok', short:'TT',
-      permissions:[
-        ['Read creator information','Used to confirm the connected creator and posting capabilities.'],
-        ['Publish content you choose','Videos or supported photos are sent only after explicit confirmation.']
-      ]
-    },
-    instagram:{
-      name:'Instagram', short:'IG',
-      permissions:[
-        ['Use your professional account','Instagram API publishing is for supported professional accounts.'],
-        ['Publish media you choose','SocialTotal sends only posts you explicitly publish.']
-      ]
-    },
-    facebook:{
-      name:'Facebook', short:'FB',
-      permissions:[
-        ['Use your selected Page','SocialTotal targets the Page you connect.'],
-        ['Publish media you choose','Nothing is posted without your Publish action.']
-      ]
-    }
+  var state={
+    items:[],
+    activeId:null,
+    background:'transparent',
+    rotation:0,
+    flipX:false,
+    addedCounter:0,
+    exporting:false
   };
 
-  var state = {
-    profile:null,
-    plan:'free',
-    accounts:{
-      youtube:{connected:false,name:''},
-      tiktok:{connected:false,name:''},
-      instagram:{connected:false,name:''},
-      facebook:{connected:false,name:''}
-    },
-    history:[],
-    media:null,
-    selected:{},
-    pendingPlatform:null,
-    youtubeAccessToken:null,
-    youtubeTokenClient:null,
-    demoMode:CONFIG.demoMode !== false
-  };
-
-  function $(selector, context){ return (context || document).querySelector(selector); }
-  function $$(selector, context){ return Array.prototype.slice.call((context || document).querySelectorAll(selector)); }
-
-  function safeParse(value, fallback){
-    try { return JSON.parse(value); } catch(error){ return fallback; }
-  }
-
-  function loadState(){
-    var saved = safeParse(localStorage.getItem(STORAGE_KEY), null);
-    if(!saved) return;
-    if(saved.profile) state.profile = saved.profile;
-    if(['free','spread','total'].indexOf(saved.plan) !== -1) state.plan = saved.plan;
-    if(saved.accounts){
-      platformOrder.forEach(function(id){
-        if(saved.accounts[id]){
-          state.accounts[id].connected = !!saved.accounts[id].connected;
-          state.accounts[id].name = saved.accounts[id].name || '';
-        }
-      });
-    }
-    if(Array.isArray(saved.history)) state.history = saved.history.slice(0,100);
-    if(typeof saved.demoMode === 'boolean') state.demoMode = saved.demoMode;
-  }
-
-  function persist(){
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      profile:state.profile,
-      plan:state.plan,
-      accounts:state.accounts,
-      history:state.history.slice(0,100),
-      demoMode:state.demoMode
-    }));
-  }
+  var $=function(selector,context){return (context||document).querySelector(selector);};
+  var $$=function(selector,context){return Array.prototype.slice.call((context||document).querySelectorAll(selector));};
 
   function escapeHTML(value){
-    return String(value == null ? '' : value)
+    return String(value==null?'':value)
       .replace(/&/g,'&amp;')
       .replace(/</g,'&lt;')
       .replace(/>/g,'&gt;')
@@ -105,1074 +28,628 @@
       .replace(/'/g,'&#039;');
   }
 
-  function sleep(ms){
-    return new Promise(function(resolve){ setTimeout(resolve, ms); });
+  function uid(){
+    if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();
+    return 'img-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
   }
 
   function formatBytes(bytes){
-    if(!Number.isFinite(bytes) || bytes <= 0) return '0 B';
-    var units = ['B','KB','MB','GB'];
-    var index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-    var value = bytes / Math.pow(1024,index);
-    return (value >= 10 || index === 0 ? value.toFixed(0) : value.toFixed(1)) + ' ' + units[index];
+    if(!Number.isFinite(bytes)||bytes<=0)return '0 B';
+    var units=['B','KB','MB','GB'];
+    var index=Math.min(Math.floor(Math.log(bytes)/Math.log(1024)),units.length-1);
+    var value=bytes/Math.pow(1024,index);
+    return (value>=10||index===0?value.toFixed(0):value.toFixed(1))+' '+units[index];
   }
 
-  function formatDuration(seconds){
-    if(!Number.isFinite(seconds) || seconds <= 0) return '—';
-    var rounded = Math.round(seconds);
-    var minutes = Math.floor(rounded / 60);
-    var secs = rounded % 60;
-    if(minutes >= 60){
-      var hours = Math.floor(minutes / 60);
-      minutes = minutes % 60;
-      return hours + 'h ' + minutes + 'm';
-    }
-    return minutes ? minutes + 'm ' + String(secs).padStart(2,'0') + 's' : secs + 's';
+  function baseName(name){
+    return String(name||'image').replace(/\.[^.]+$/,'');
   }
 
-  function ratioName(width,height){
-    if(!width || !height) return '—';
-    var ratio = width / height;
-    var known = [
-      [9/16,'9:16'],[1,'1:1'],[4/5,'4:5'],[3/4,'3:4'],[4/3,'4:3'],[16/9,'16:9']
-    ];
-    for(var i=0;i<known.length;i++){
-      if(Math.abs(ratio-known[i][0]) < .035) return known[i][1];
-    }
-    return ratio.toFixed(2) + ':1';
+  function extensionForMime(mime){
+    if(mime==='image/jpeg')return 'jpg';
+    if(mime==='image/webp')return 'webp';
+    if(mime==='image/png')return 'png';
+    return 'png';
   }
 
-  function planAllows(platform){
-    if(platform === 'youtube' || platform === 'tiktok') return true;
-    return state.plan === 'spread' || state.plan === 'total';
-  }
-
-  function planLabel(){
-    return state.plan === 'total' ? 'Total' : state.plan === 'spread' ? 'Spread' : 'Free';
+  function safeFilePart(value){
+    return String(value||'image')
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g,'-')
+      .replace(/\s+/g,' ')
+      .trim()
+      .replace(/[. ]+$/g,'')
+      .slice(0,120)||'image';
   }
 
   function toast(title,message,type){
-    var region = $('#toastRegion');
-    if(!region) return;
-    var node = document.createElement('div');
-    node.className = 'toast';
-    var glyph = type === 'error' ? '!' : type === 'success' ? '✓' : '•';
-    node.innerHTML =
-      '<span class="toast-icon">' + glyph + '</span>' +
-      '<span class="toast-copy"><b>' + escapeHTML(title) + '</b><span>' + escapeHTML(message) + '</span></span>' +
+    var region=$('#toastRegion');
+    var node=document.createElement('div');
+    node.className='toast';
+    node.innerHTML=
+      '<span class="toast-icon">'+(type==='error'?'!':type==='success'?'✓':'•')+'</span>'+
+      '<span class="toast-copy"><b>'+escapeHTML(title)+'</b><span>'+escapeHTML(message)+'</span></span>'+
       '<button class="toast-close" type="button" aria-label="Dismiss">×</button>';
     region.appendChild(node);
-    requestAnimationFrame(function(){ node.classList.add('show'); });
-    var close = function(){
+    requestAnimationFrame(function(){node.classList.add('show');});
+    var close=function(){
       node.classList.remove('show');
-      setTimeout(function(){ if(node.parentNode) node.parentNode.removeChild(node); },220);
+      setTimeout(function(){if(node.parentNode)node.remove();},190);
     };
     $('.toast-close',node).addEventListener('click',close);
-    setTimeout(close,4300);
+    setTimeout(close,4200);
   }
 
-  function showView(name){
-    var auth = $('#authView');
-    var onboarding = $('#onboardingView');
-    var app = $('#appView');
-    [auth,onboarding,app].forEach(function(el){
-      el.classList.add('hidden');
-      el.setAttribute('aria-hidden','true');
+  function loadImage(url){
+    return new Promise(function(resolve,reject){
+      var image=new Image();
+      image.onload=function(){resolve(image);};
+      image.onerror=function(){reject(new Error('This image could not be decoded by your browser.'));};
+      image.src=url;
     });
-    var target = name === 'auth' ? auth : name === 'onboarding' ? onboarding : app;
-    target.classList.remove('hidden');
-    target.setAttribute('aria-hidden','false');
   }
 
-  function finishLogin(profile){
-    state.profile = {
-      name:profile.name || 'SocialTotal creator',
-      email:profile.email || '',
-      picture:profile.picture || ''
-    };
-    persist();
-    updateProfileUI();
-    showView('onboarding');
-    renderAll();
+  async function hashFile(file){
+    if(!window.crypto||!crypto.subtle)return file.name+'-'+file.size+'-'+file.lastModified;
+    try{
+      var buffer=await file.arrayBuffer();
+      var digest=await crypto.subtle.digest('SHA-256',buffer);
+      return Array.from(new Uint8Array(digest)).map(function(byte){return byte.toString(16).padStart(2,'0');}).join('');
+    }catch(error){
+      return file.name+'-'+file.size+'-'+file.lastModified;
+    }
   }
 
-  function enterApp(){
-    showView('app');
-    routeTo('home');
-    renderAll();
+  async function inspectFile(file){
+    if(!file||file.type.indexOf('image/')!==0)throw new Error('Only image files are supported.');
+    var url=URL.createObjectURL(file);
+    try{
+      var image=await loadImage(url);
+      return {
+        id:uid(),
+        file:file,
+        url:url,
+        name:file.name,
+        size:file.size,
+        type:file.type||'image/png',
+        width:image.naturalWidth,
+        height:image.naturalHeight,
+        hash:await hashFile(file),
+        duplicateOf:null,
+        selected:true,
+        addedAt:state.addedCounter++
+      };
+    }catch(error){
+      URL.revokeObjectURL(url);
+      throw error;
+    }
   }
 
-  function updateProfileUI(){
-    var profile = state.profile || {name:'Demo creator',email:'demo@socialtotal.app',picture:''};
-    $('#profileName').textContent = profile.name;
-    $('#profileEmail').textContent = profile.email || 'SocialTotal account';
-    $('#profileAvatar').textContent = (profile.name || 'S').trim().charAt(0).toUpperCase();
-    $('#homeGreeting').textContent = 'Good to see you, ' + (profile.name || 'creator').split(' ')[0] + '.';
-  }
-
-  function initGoogleSignIn(attempt){
-    attempt = attempt || 0;
-    if(!CONFIG.googleClientId) return;
-    if(!window.google || !google.accounts || !google.accounts.id){
-      if(attempt < 30) setTimeout(function(){ initGoogleSignIn(attempt + 1); },200);
+  async function addFiles(fileList){
+    var files=Array.from(fileList||[]).filter(function(file){return file.type.indexOf('image/')===0;});
+    if(!files.length){
+      toast('No images found','Choose PNG, JPG, WebP, GIF or another browser-readable image.','error');
       return;
     }
-    try{
-      google.accounts.id.initialize({
-        client_id:CONFIG.googleClientId,
-        callback:function(response){
-          var payload = decodeJwtPayload(response.credential);
-          if(!payload){
-            toast('Google sign-in failed','The returned identity token could not be read.','error');
-            return;
-          }
-          finishLogin({
-            name:payload.name || payload.given_name || 'Google user',
-            email:payload.email || '',
-            picture:payload.picture || ''
-          });
-        }
-      });
-      var host = $('#googleButtonHost');
-      host.innerHTML = '';
-      google.accounts.id.renderButton(host,{
-        type:'standard',
-        theme:'filled_black',
-        size:'large',
-        text:'continue_with',
-        shape:'rectangular',
-        width:Math.min(390,Math.max(260,host.clientWidth || 390))
-      });
-      $('#googleFallbackButton').classList.add('hidden');
-    }catch(error){
-      console.warn('Google sign-in setup failed',error);
+    var rejected=(fileList?fileList.length:0)-files.length;
+    var added=0;
+    for(var i=0;i<files.length;i++){
+      try{
+        var item=await inspectFile(files[i]);
+        state.items.push(item);
+        added++;
+        if(!state.activeId)state.activeId=item.id;
+      }catch(error){
+        console.warn(error);
+      }
     }
+    recomputeDuplicates();
+    renderAll();
+    toast('Images added',added+' image'+(added===1?'':'s')+' ready'+(rejected?' · '+rejected+' unsupported file'+(rejected===1?'':'s')+' skipped':''),'success');
   }
 
-  function decodeJwtPayload(token){
-    try{
-      var part = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-      var json = decodeURIComponent(atob(part).split('').map(function(char){
-        return '%' + ('00' + char.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      return JSON.parse(json);
-    }catch(error){
-      return null;
-    }
-  }
-
-  function demoLogin(source,email){
-    finishLogin({
-      name:source === 'Discord' ? 'Discord creator' : email ? email.split('@')[0] : 'Demo creator',
-      email:email || (source.toLowerCase() + '@demo.socialtotal.app')
+  function recomputeDuplicates(){
+    var seen={};
+    state.items.forEach(function(item){
+      item.duplicateOf=seen[item.hash]||null;
+      if(!seen[item.hash])seen[item.hash]=item.id;
     });
-    toast('Demo sign-in','Add production auth credentials later to replace this local demo session.','success');
   }
 
-  function routeTo(route){
-    if(!state.profile) return;
-    $$('.route').forEach(function(page){
-      page.classList.toggle('active',page.getAttribute('data-page') === route);
-    });
-    $$('[data-route]').forEach(function(button){
-      button.classList.toggle('active',button.getAttribute('data-route') === route);
-    });
-    if(route === 'billing') renderBilling();
-    if(route === 'accounts') renderAccounts();
-    if(route === 'library') renderLibrary();
-    if(route === 'analytics') renderAnalytics();
-    window.scrollTo({top:0,behavior:'auto'});
+  function activeItem(){
+    return state.items.find(function(item){return item.id===state.activeId;})||null;
   }
 
-  function connectedCount(){
-    return platformOrder.filter(function(id){ return state.accounts[id].connected; }).length;
+  function selectedItems(){
+    return state.items.filter(function(item){return item.selected;});
+  }
+
+  function filteredLibraryItems(){
+    var query=$('#searchInput').value.trim().toLowerCase();
+    var items=state.items.slice();
+    if(query)items=items.filter(function(item){return item.name.toLowerCase().indexOf(query)!==-1;});
+    return sortItems(items,$('#librarySort').value);
+  }
+
+  function sortItems(items,mode){
+    var copy=items.slice();
+    if(mode==='name')copy.sort(function(a,b){return a.name.localeCompare(b.name);});
+    if(mode==='size-desc')copy.sort(function(a,b){return b.size-a.size;});
+    if(mode==='size-asc')copy.sort(function(a,b){return a.size-b.size;});
+    if(mode==='pixels-desc')copy.sort(function(a,b){return (b.width*b.height)-(a.width*a.height);});
+    if(mode==='added'||mode==='library')copy.sort(function(a,b){return a.addedAt-b.addedAt;});
+    return copy;
   }
 
   function renderAll(){
-    updateProfileUI();
-    $('#planBadge').textContent = planLabel();
-    $('#connectedSummary').textContent = connectedCount() + ' connected';
-    $('#onboardingStatus').textContent = connectedCount() + (connectedCount() === 1 ? ' account connected' : ' accounts connected');
-    $('#demoModeToggle').checked = !!state.demoMode;
-    renderOnboarding();
-    renderHome();
-    renderAccounts();
-    renderDestinations();
+    renderStats();
     renderLibrary();
-    renderAnalytics();
-    renderBilling();
-    updateAds();
+    renderPreview();
+    renderOrganise();
+    renderExportSummary();
+    $('#editorShell').classList.toggle('hidden',!state.items.length);
+    $('#workspaceStats').classList.toggle('hidden',!state.items.length);
   }
 
-  function renderOnboarding(){
-    $('[data-connect]',$('#onboardingPlatforms')).forEach(function(card){
-      var id = card.getAttribute('data-connect');
-      var connected = state.accounts[id].connected;
-      card.classList.toggle('connected',connected);
-      var action = $('.connect-action',card);
-      if(action) action.textContent = connected ? 'Connected' : 'Connect';
-    });
+  function renderStats(){
+    var total=state.items.reduce(function(sum,item){return sum+item.size;},0);
+    var duplicates=state.items.filter(function(item){return !!item.duplicateOf;}).length;
+    $('#statCount').textContent=state.items.length;
+    $('#statSize').textContent=formatBytes(total);
+    $('#statDuplicates').textContent=duplicates;
+    $('#statSelected').textContent=selectedItems().length;
   }
 
-  function platformLogo(id){
-    return '<span class="platform-logo ' + id + '">' + platforms[id].short + '</span>';
-  }
-
-  function renderHome(){
-    var host = $('#homeAccountList');
-    if(!host) return;
-    host.innerHTML = platformOrder.map(function(id){
-      var account = state.accounts[id];
-      var subtitle = account.connected ? (account.name || 'Connected account') : (planAllows(id) ? 'Not connected' : 'Spread plan');
-      return '<div class="home-account-row">' +
-        platformLogo(id) +
-        '<span class="account-copy"><b>' + platforms[id].name + '</b><span>' + escapeHTML(subtitle) + '</span></span>' +
-        '<span class="' + (account.connected ? 'account-status' : '') + '">' + (account.connected ? 'Connected' : '—') + '</span>' +
-      '</div>';
-    }).join('');
-
-    var recent = $('#recentActivity');
-    if(state.history.length){
-      var item = state.history[0];
-      recent.className = 'recent-card';
-      recent.innerHTML =
-        '<div class="library-item">' +
-          '<span class="library-thumb">' + (item.kind === 'image' ? 'IMG' : 'VID') + '</span>' +
-          '<span class="library-copy"><b>' + escapeHTML(item.title || item.fileName || 'Untitled post') + '</b><span>' + escapeHTML(item.when) + '</span></span>' +
-          '<span class="library-platforms">' + item.platforms.map(function(id){ return '<span>' + platforms[id].short + '</span>'; }).join('') + '</span>' +
-        '</div>';
-    }else{
-      recent.className = 'empty-state compact';
-      recent.innerHTML = '<div class="empty-icon">↗</div><b>Nothing published yet</b><p>Your first SocialTotal post will appear here.</p>';
+  function renderLibrary(){
+    var host=$('#imageGrid');
+    var items=filteredLibraryItems();
+    if(!state.items.length){
+      host.innerHTML='';
+      return;
     }
-  }
-
-  function renderAccounts(){
-    var host = $('#accountsGrid');
-    if(!host) return;
-    host.innerHTML = platformOrder.map(function(id){
-      var account = state.accounts[id];
-      var locked = !planAllows(id);
-      var actionLabel = account.connected ? 'Disconnect' : locked ? '$1 plan' : 'Connect';
-      return '<article class="account-card">' +
-        platformLogo(id) +
-        '<div class="account-card-copy"><b>' + platforms[id].name + '</b><span>' +
-          (account.connected ? escapeHTML(account.name || 'Connected') : locked ? 'Unlock with Spread or Total' : 'Ready to connect') +
-        '</span></div>' +
-        '<button class="small-button account-card-action" data-account-action="' + id + '" type="button">' + actionLabel + '</button>' +
+    if(!items.length){
+      host.innerHTML='<div class="library-empty">No images match that search.</div>';
+      return;
+    }
+    host.innerHTML=items.map(function(item){
+      return '<article class="image-card '+(item.id===state.activeId?'active':'')+'" data-image-id="'+item.id+'">'+
+        '<label class="card-check" title="Select for export"><input type="checkbox" data-select-id="'+item.id+'" '+(item.selected?'checked':'')+'><i></i></label>'+
+        '<div class="thumb"><img src="'+item.url+'" alt="">'+(item.duplicateOf?'<span class="duplicate-badge">Duplicate</span>':'')+'</div>'+
+        '<div class="card-body"><b>'+escapeHTML(item.name)+'</b><span>'+item.width+'×'+item.height+' · '+formatBytes(item.size)+'</span></div>'+
       '</article>';
     }).join('');
 
-    $$('[data-account-action]',host).forEach(function(button){
-      button.addEventListener('click',function(){
-        var id = button.getAttribute('data-account-action');
-        if(state.accounts[id].connected) disconnectPlatform(id);
-        else requestConnect(id);
+    $$('[data-image-id]',host).forEach(function(card){
+      card.addEventListener('click',function(event){
+        if(event.target.closest('.card-check'))return;
+        state.activeId=card.getAttribute('data-image-id');
+        renderLibrary();
+        renderPreview();
+        updateDownloadButton();
       });
     });
-  }
 
-  function getCompatibility(media){
-    var result = {
-      youtube:{ok:false,reason:'Choose a video'},
-      tiktok:{ok:false,reason:'Choose media'},
-      instagram:{ok:false,reason:'Choose media'},
-      facebook:{ok:false,reason:'Choose media'}
-    };
-    if(!media) return result;
-
-    if(media.kind === 'image'){
-      result.youtube = {ok:false,reason:'Video required'};
-      result.tiktok = {ok:true,reason:'Photo post'};
-      result.instagram = {ok:true,reason:'Image post'};
-      result.facebook = {ok:true,reason:'Image post'};
-      return result;
-    }
-
-    result.youtube = {ok:true,reason:media.duration > 60 ? 'Long-form video' : 'Video / Short'};
-    result.tiktok = {ok:true,reason:media.duration > 60 ? 'Long video' : 'Video'};
-    var ratio = media.width && media.height ? media.width / media.height : 1;
-    var isPortrait = ratio <= .82;
-    var isSquareish = ratio > .82 && ratio <= 1.08;
-    var short = media.duration <= 60.5;
-
-    if(short && (isPortrait || isSquareish)){
-      result.instagram = {ok:true,reason:isPortrait ? 'Reel-ready' : 'Feed video'};
-    }else{
-      result.instagram = {ok:false,reason:!short ? 'Demo profile routes longer video to YouTube/TikTok' : 'Use portrait or square media'};
-    }
-
-    if(short && isPortrait){
-      result.facebook = {ok:true,reason:'Reel-ready'};
-    }else{
-      result.facebook = {ok:false,reason:!short ? 'Demo Reel profile is 60s or less' : 'Use a vertical video'};
-    }
-    return result;
-  }
-
-  function renderDestinations(){
-    var host = $('#destinationList');
-    if(!host) return;
-    var compatibility = getCompatibility(state.media);
-    host.innerHTML = platformOrder.map(function(id){
-      var check = compatibility[id];
-      var allowed = planAllows(id);
-      var connected = state.accounts[id].connected;
-      var selected = !!state.selected[id];
-      var right = '';
-      if(!check.ok){
-        right = '<span class="incompatible-tag">Not a fit</span>';
-      }else if(!allowed){
-        right = '<button class="lock-tag" data-upgrade-from="' + id + '" type="button">$1+</button>';
-      }else if(!connected){
-        right = '<button class="small-button" data-connect-inline="' + id + '" type="button">Connect</button>';
-      }else{
-        right = '<label class="platform-toggle" aria-label="Publish to ' + platforms[id].name + '"><input data-destination-toggle="' + id + '" type="checkbox" ' + (selected ? 'checked' : '') + '><span></span></label>';
-      }
-      var classes = 'destination-row';
-      if(!check.ok) classes += ' unavailable';
-      if(check.ok && !allowed) classes += ' plan-locked';
-      return '<div class="' + classes + '">' +
-        platformLogo(id) +
-        '<span class="destination-copy"><b>' + platforms[id].name + '</b><span>' + escapeHTML(check.reason) + (connected ? ' · ' + escapeHTML(state.accounts[id].name || 'Connected') : '') + '</span></span>' +
-        right +
-      '</div>';
-    }).join('');
-
-    $$('[data-destination-toggle]',host).forEach(function(input){
+    $$('[data-select-id]',host).forEach(function(input){
       input.addEventListener('change',function(){
-        var id = input.getAttribute('data-destination-toggle');
-        state.selected[id] = input.checked;
-        updatePublishState();
+        var item=state.items.find(function(candidate){return candidate.id===input.getAttribute('data-select-id');});
+        if(item)item.selected=input.checked;
+        renderStats();
+        renderExportSummary();
       });
     });
-    $$('[data-connect-inline]',host).forEach(function(button){
-      button.addEventListener('click',function(){ requestConnect(button.getAttribute('data-connect-inline')); });
-    });
-    $$('[data-upgrade-from]',host).forEach(function(button){
-      button.addEventListener('click',function(){
-        routeTo('billing');
-        toast('Unlock all platforms','Spread is $1/month in the planned pricing model. Demo billing can unlock it now.','info');
-      });
-    });
-
-    var note = $('#detectionNote');
-    if(!state.media){
-      note.className = 'detection-note';
-      note.innerHTML = '<span class="detect-dot"></span><p>Choose media to run compatibility detection.</p>';
-    }else{
-      var compatible = platformOrder.filter(function(id){ return compatibility[id].ok; });
-      note.className = 'detection-note ok';
-      note.innerHTML = '<span class="detect-dot"></span><p>Detected ' + escapeHTML(state.media.kind) + ' · ' + escapeHTML(ratioName(state.media.width,state.media.height)) + ' · fits ' + compatible.length + ' platform' + (compatible.length === 1 ? '' : 's') + ' in this demo profile.</p>';
-    }
-    updatePublishState();
   }
 
-  function updatePublishState(){
-    var selected = platformOrder.filter(function(id){ return !!state.selected[id]; });
-    $('#selectedCount').textContent = selected.length + (selected.length === 1 ? ' platform' : ' platforms');
-    var button = $('#publishButton');
-    var missingConnections = selected.filter(function(id){ return !state.accounts[id].connected; });
-    button.disabled = !state.media || !selected.length || !!missingConnections.length;
-    if(!state.media){
-      $('#publishHint').textContent = 'Choose media first.';
-    }else if(!selected.length){
-      $('#publishHint').textContent = 'Select at least one connected destination.';
-    }else if(missingConnections.length){
-      $('#publishHint').textContent = 'Connect every selected destination first.';
-    }else{
-      $('#publishHint').textContent = 'Ready to publish to ' + selected.length + (selected.length === 1 ? ' destination.' : ' destinations.');
-    }
-  }
-
-  function selectAvailable(){
-    if(!state.media){
-      toast('Choose media first','SocialTotal needs the file metadata before it can select compatible platforms.','info');
+  function renderPreview(){
+    var item=activeItem();
+    var stage=$('#previewStage');
+    if(!item){
+      $('#previewName').textContent='Choose an image';
+      $('#previewMeta').textContent='—';
+      stage.innerHTML='<div class="preview-empty"><span>⌁</span><p>Select a thumbnail to preview it.</p></div>';
+      updateDownloadButton();
       return;
     }
-    var compatibility = getCompatibility(state.media);
-    platformOrder.forEach(function(id){
-      state.selected[id] = !!(compatibility[id].ok && planAllows(id) && state.accounts[id].connected);
+    $('#previewName').textContent=item.name;
+    $('#previewMeta').textContent=item.width+'×'+item.height+' · '+formatBytes(item.size);
+    stage.innerHTML='<img src="'+item.url+'" alt="'+escapeHTML(item.name)+'">';
+    updateDownloadButton();
+  }
+
+  function orientationName(item){
+    var ratio=item.width/item.height;
+    if(Math.abs(ratio-1)<.06)return 'Square';
+    return ratio>1?'Landscape':'Portrait';
+  }
+
+  function resolutionBucket(item){
+    var mp=(item.width*item.height)/1000000;
+    if(mp<1)return 'Small';
+    if(mp<4)return 'Medium';
+    if(mp<12)return 'Large';
+    return 'Huge';
+  }
+
+  function targetMime(item){
+    var requested=$('#formatSelect').value;
+    if(requested!=='original')return requested;
+    if(['image/png','image/jpeg','image/webp'].indexOf(item.type)!==-1)return item.type;
+    return 'image/png';
+  }
+
+  function targetFolder(item){
+    var mode=$('#groupSelect').value;
+    if(mode==='orientation')return orientationName(item);
+    if(mode==='format')return extensionForMime(targetMime(item)).toUpperCase();
+    if(mode==='resolution')return resolutionBucket(item);
+    return '';
+  }
+
+  function outputOrder(){
+    var items=$('#selectedOnlyCheckbox').checked?selectedItems():state.items.slice();
+    var mode=$('#exportSort').value;
+    if(mode==='library')return sortItems(items,'added');
+    return sortItems(items,mode);
+  }
+
+  function outputName(item,index){
+    var pattern=$('#renamePattern').value.trim()||'{name}';
+    var ext=extensionForMime(targetMime(item));
+    var replacements={
+      '{index}':String(index+1).padStart(3,'0'),
+      '{name}':baseName(item.name),
+      '{width}':String(item.width),
+      '{height}':String(item.height),
+      '{type}':ext
+    };
+    Object.keys(replacements).forEach(function(token){
+      pattern=pattern.split(token).join(replacements[token]);
     });
-    renderDestinations();
+    pattern=safeFilePart(pattern);
+    return pattern+'.'+ext;
   }
 
-  function inspectFile(file){
-    if(!file) return Promise.reject(new Error('No file selected.'));
-    var isImage = file.type.indexOf('image/') === 0;
-    var isVideo = file.type.indexOf('video/') === 0;
-    if(!isImage && !isVideo) return Promise.reject(new Error('Choose an image or video file.'));
-
-    if(state.media && state.media.objectUrl) URL.revokeObjectURL(state.media.objectUrl);
-    var objectUrl = URL.createObjectURL(file);
-
-    return new Promise(function(resolve,reject){
-      if(isImage){
-        var image = new Image();
-        image.onload = function(){
-          resolve({
-            file:file,
-            fileName:file.name,
-            size:file.size,
-            mime:file.type,
-            kind:'image',
-            width:image.naturalWidth,
-            height:image.naturalHeight,
-            duration:0,
-            objectUrl:objectUrl
-          });
-        };
-        image.onerror = function(){
-          URL.revokeObjectURL(objectUrl);
-          reject(new Error('This image could not be read by your browser.'));
-        };
-        image.src = objectUrl;
-      }else{
-        var video = document.createElement('video');
-        video.preload = 'metadata';
-        video.onloadedmetadata = function(){
-          resolve({
-            file:file,
-            fileName:file.name,
-            size:file.size,
-            mime:file.type,
-            kind:'video',
-            width:video.videoWidth,
-            height:video.videoHeight,
-            duration:Number(video.duration) || 0,
-            objectUrl:objectUrl
-          });
-        };
-        video.onerror = function(){
-          URL.revokeObjectURL(objectUrl);
-          reject(new Error('This video format could not be inspected by your browser.'));
-        };
-        video.src = objectUrl;
-      }
-    });
-  }
-
-  function setMedia(media){
-    state.media = media;
-    state.selected = {};
-    $('#dropEmpty').classList.add('hidden');
-    $('#mediaPreview').classList.remove('hidden');
-    $('#fileName').textContent = media.fileName;
-    $('#fileSize').textContent = formatBytes(media.size);
-    $('#mediaTypeFact').textContent = media.kind === 'video' ? 'Video' : 'Image';
-    $('#dimensionsFact').textContent = media.width + ' × ' + media.height;
-    $('#ratioFact').textContent = ratioName(media.width,media.height);
-    $('#durationFact').textContent = media.kind === 'video' ? formatDuration(media.duration) : 'Still';
-    var stage = $('#previewStage');
-    stage.innerHTML = '';
-    var preview = document.createElement(media.kind === 'video' ? 'video' : 'img');
-    preview.src = media.objectUrl;
-    if(media.kind === 'video'){
-      preview.controls = true;
-      preview.muted = true;
-      preview.playsInline = true;
-    }
-    stage.appendChild(preview);
-    renderDestinations();
-    toast('Media detected',media.width + '×' + media.height + ' · ' + ratioName(media.width,media.height) + (media.kind === 'video' ? ' · ' + formatDuration(media.duration) : ''),'success');
-  }
-
-  function handleSelectedFile(file){
-    inspectFile(file).then(setMedia).catch(function(error){
-      toast('Could not read media',error.message,'error');
-    });
-  }
-
-  function requestConnect(id){
-    if(!platforms[id]) return;
-    if(!planAllows(id)){
-      if($('#appView').classList.contains('hidden')){
-        toast('Available on Spread','Instagram and Facebook unlock on the $1 plan. Finish onboarding to view plans.','info');
-      }else{
-        routeTo('billing');
-        toast('Available on Spread','Choose the $1 demo plan to unlock ' + platforms[id].name + '.','info');
-      }
+  function renderOrganise(){
+    var first=outputOrder()[0];
+    $('#renameExample').textContent='Example: '+(first?outputName(first,0):'image-001.webp');
+    var folderHost=$('#folderPreview');
+    if(!state.items.length){
+      folderHost.innerHTML='<div class="folder-preview-row"><span>No images yet</span><b>0</b></div>';
       return;
     }
-    state.pendingPlatform = id;
-    openPermissionModal(id);
-  }
-
-  function openPermissionModal(id){
-    var modal = $('#permissionModal');
-    var def = platforms[id];
-    $('#permissionLogo').className = 'platform-logo ' + id;
-    $('#permissionLogo').textContent = def.short;
-    $('#permissionTitle').textContent = 'Connect ' + def.name;
-    $('#permissionDescription').textContent = id === 'youtube'
-      ? 'Continue to Google to choose a channel and review SocialTotal’s requested YouTube permissions.'
-      : 'SocialTotal will use ' + def.name + '’s supported authorization flow in production.';
-    $('#permissionList').innerHTML = def.permissions.map(function(item){
-      return '<div class="permission-item"><span class="permission-check">✓</span><div><b>' + escapeHTML(item[0]) + '</b><span>' + escapeHTML(item[1]) + '</span></div></div>';
+    var counts={};
+    outputOrder().forEach(function(item){
+      var folder=targetFolder(item)||'Root';
+      counts[folder]=(counts[folder]||0)+1;
+    });
+    folderHost.innerHTML=Object.keys(counts).sort().map(function(folder){
+      return '<div class="folder-preview-row"><span>'+escapeHTML(folder)+'</span><b>'+counts[folder]+'</b></div>';
     }).join('');
-    var realReady = providerConfigured(id);
-    $('#permissionDemoWarning').classList.toggle('hidden',realReady || !state.demoMode);
-    $('#permissionContinue').textContent = realReady ? 'Continue to ' + def.name : state.demoMode ? 'Connect in demo' : 'Provider not configured';
-    $('#permissionContinue').disabled = !realReady && !state.demoMode;
-    openModal('permissionModal');
   }
 
-  function providerConfigured(id){
-    if(id === 'youtube') return !!CONFIG.googleClientId;
-    return !!CONFIG.backendBaseUrl;
+  function renderExportSummary(){
+    var items=outputOrder();
+    var total=items.reduce(function(sum,item){return sum+item.size;},0);
+    $('#exportSummary').textContent=items.length
+      ?items.length+' image'+(items.length===1?'':'s')+' ready · '+formatBytes(total)+' before processing.'
+      :'Add images to start building your export.';
+    $('#exportZipButton').disabled=!items.length||state.exporting;
+    $('#exportStatus').textContent=state.exporting?'Processing images…':items.length?'Ready to export':'Nothing to export yet';
+    updateDownloadButton();
   }
 
-  function connectPendingPlatform(){
-    var id = state.pendingPlatform;
-    if(!id) return;
-    closeModal('permissionModal');
-    if(id === 'youtube' && CONFIG.googleClientId){
-      connectYouTube();
-      return;
+  function updateDownloadButton(){
+    $('#downloadCurrentButton').disabled=!activeItem()||state.exporting;
+  }
+
+  function currentSettings(){
+    var maxWidth=parseInt($('#maxWidthInput').value,10);
+    var maxHeight=parseInt($('#maxHeightInput').value,10);
+    return {
+      mime:null,
+      quality:Math.max(.35,Math.min(1,parseInt($('#qualityRange').value,10)/100)),
+      maxWidth:Number.isFinite(maxWidth)&&maxWidth>0?maxWidth:null,
+      maxHeight:Number.isFinite(maxHeight)&&maxHeight>0?maxHeight:null,
+      padding:parseInt($('#paddingRange').value,10)||0,
+      radius:parseInt($('#radiusRange').value,10)||0,
+      background:state.background,
+      rotation:((state.rotation%360)+360)%360,
+      flipX:state.flipX
+    };
+  }
+
+  function roundRectPath(ctx,x,y,width,height,radius){
+    var r=Math.max(0,Math.min(radius,Math.min(width,height)/2));
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+width,y,x+width,y+height,r);
+    ctx.arcTo(x+width,y+height,x,y+height,r);
+    ctx.arcTo(x,y+height,x,y,r);
+    ctx.arcTo(x,y,x+width,y,r);
+    ctx.closePath();
+  }
+
+  async function processItem(item){
+    var image=await loadImage(item.url);
+    var settings=currentSettings();
+    var rotation=settings.rotation;
+    var swapped=rotation===90||rotation===270;
+    var rotatedWidth=swapped?item.height:item.width;
+    var rotatedHeight=swapped?item.width:item.height;
+    var scale=1;
+    if(settings.maxWidth)scale=Math.min(scale,settings.maxWidth/rotatedWidth);
+    if(settings.maxHeight)scale=Math.min(scale,settings.maxHeight/rotatedHeight);
+    scale=Math.min(1,scale);
+    var displayWidth=Math.max(1,Math.round(rotatedWidth*scale));
+    var displayHeight=Math.max(1,Math.round(rotatedHeight*scale));
+    var pad=settings.padding;
+    var canvas=document.createElement('canvas');
+    canvas.width=displayWidth+pad*2;
+    canvas.height=displayHeight+pad*2;
+    var ctx=canvas.getContext('2d',{alpha:true});
+    if(!ctx)throw new Error('Canvas processing is unavailable.');
+
+    if(settings.background!=='transparent'){
+      ctx.fillStyle=settings.background;
+      ctx.fillRect(0,0,canvas.width,canvas.height);
     }
-    if(CONFIG.backendBaseUrl && !state.demoMode){
-      var returnUrl = window.location.href.split('#')[0];
-      window.location.href = CONFIG.backendBaseUrl.replace(/\/$/,'') + '/auth/' + encodeURIComponent(id) + '/start?return=' + encodeURIComponent(returnUrl);
-      return;
-    }
-    simulateConnection(id);
+
+    ctx.save();
+    roundRectPath(ctx,pad,pad,displayWidth,displayHeight,settings.radius);
+    ctx.clip();
+
+    ctx.translate(pad+displayWidth/2,pad+displayHeight/2);
+    if(settings.flipX)ctx.scale(-1,1);
+    ctx.rotate(rotation*Math.PI/180);
+    var drawWidth=item.width*scale;
+    var drawHeight=item.height*scale;
+    ctx.drawImage(image,-drawWidth/2,-drawHeight/2,drawWidth,drawHeight);
+    ctx.restore();
+
+    var mime=targetMime(item);
+    var blob=await new Promise(function(resolve,reject){
+      canvas.toBlob(function(result){
+        if(result)resolve(result);
+        else reject(new Error('The browser could not encode this image.'));
+      },mime,settings.quality);
+    });
+
+    return {blob:blob,width:canvas.width,height:canvas.height,mime:mime};
   }
 
-  function setupYouTubeTokenClient(attempt){
-    attempt = attempt || 0;
-    if(!CONFIG.googleClientId) return;
-    if(!window.google || !google.accounts || !google.accounts.oauth2){
-      if(attempt < 30) setTimeout(function(){ setupYouTubeTokenClient(attempt + 1); },200);
+  function downloadBlob(blob,filename){
+    var url=URL.createObjectURL(blob);
+    var link=document.createElement('a');
+    link.href=url;
+    link.download=filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+  }
+
+  async function downloadCurrent(){
+    var item=activeItem();
+    if(!item)return;
+    try{
+      setBusy(true);
+      var processed=await processItem(item);
+      var index=Math.max(0,outputOrder().findIndex(function(candidate){return candidate.id===item.id;}));
+      downloadBlob(processed.blob,outputName(item,index));
+      toast('Image exported','Processed locally and downloaded.','success');
+    }catch(error){
+      toast('Export failed',error.message,'error');
+    }finally{
+      setBusy(false);
+    }
+  }
+
+  async function exportZip(){
+    var items=outputOrder();
+    if(!items.length)return;
+    if(!window.JSZip){
+      toast('ZIP library unavailable','Reload the page while connected to the internet, then try again.','error');
       return;
     }
     try{
-      state.youtubeTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id:CONFIG.googleClientId,
-        scope:'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
-        callback:function(response){
-          if(!response || response.error || !response.access_token){
-            toast('YouTube connection failed',(response && response.error_description) || (response && response.error) || 'Google did not return an access token.','error');
-            return;
-          }
-          state.youtubeAccessToken = response.access_token;
-          fetchYouTubeChannel(response.access_token).then(function(channel){
-            state.accounts.youtube.connected = true;
-            state.accounts.youtube.name = channel || 'YouTube channel';
-            persist();
-            renderAll();
-            toast('YouTube connected',state.accounts.youtube.name,'success');
-          }).catch(function(error){
-            state.accounts.youtube.connected = true;
-            state.accounts.youtube.name = 'YouTube channel';
-            persist();
-            renderAll();
-            toast('YouTube connected','The upload permission is active, but channel details could not be loaded.','success');
-            console.warn(error);
-          });
-        }
-      });
-    }catch(error){
-      console.warn('YouTube token client setup failed',error);
-    }
-  }
-
-  function connectYouTube(){
-    if(!state.youtubeTokenClient){
-      setupYouTubeTokenClient();
-      setTimeout(function(){
-        if(state.youtubeTokenClient) state.youtubeTokenClient.requestAccessToken({prompt:'consent'});
-        else if(state.demoMode) simulateConnection('youtube');
-        else toast('Google is not ready','Reload after adding a valid Google OAuth client ID.','error');
-      },300);
-      return;
-    }
-    state.youtubeTokenClient.requestAccessToken({prompt:'consent'});
-  }
-
-  async function fetchYouTubeChannel(token){
-    var response = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',{
-      headers:{Authorization:'Bearer ' + token}
-    });
-    if(!response.ok) throw new Error('YouTube channel lookup failed.');
-    var data = await response.json();
-    return data.items && data.items[0] && data.items[0].snippet ? data.items[0].snippet.title : 'YouTube channel';
-  }
-
-  function simulateConnection(id){
-    state.accounts[id].connected = true;
-    state.accounts[id].name = 'Demo ' + platforms[id].name + ' account';
-    persist();
-    renderAll();
-    toast(platforms[id].name + ' connected','Demo connection saved in this browser.','success');
-  }
-
-  function disconnectPlatform(id){
-    if(id === 'youtube' && state.youtubeAccessToken && window.google && google.accounts && google.accounts.oauth2){
-      try{ google.accounts.oauth2.revoke(state.youtubeAccessToken,function(){}); }catch(error){ console.warn(error); }
-      state.youtubeAccessToken = null;
-    }
-    state.accounts[id].connected = false;
-    state.accounts[id].name = '';
-    state.selected[id] = false;
-    persist();
-    renderAll();
-    toast(platforms[id].name + ' disconnected','The local connection state was removed.','info');
-  }
-
-  async function uploadYouTube(media,title,description,privacy){
-    if(!state.youtubeAccessToken) throw new Error('Reconnect YouTube to refresh its upload permission.');
-    if(!media || media.kind !== 'video') throw new Error('YouTube demo publishing requires a video.');
-
-    var metadata = {
-      snippet:{
-        title:title || media.fileName.replace(/\.[^.]+$/,''),
-        description:description || '',
-        categoryId:'22'
-      },
-      status:{privacyStatus:privacy || 'private'}
-    };
-
-    var start = await fetch('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{
-      method:'POST',
-      headers:{
-        Authorization:'Bearer ' + state.youtubeAccessToken,
-        'Content-Type':'application/json; charset=UTF-8',
-        'X-Upload-Content-Length':String(media.file.size),
-        'X-Upload-Content-Type':media.mime || 'video/*'
-      },
-      body:JSON.stringify(metadata)
-    });
-
-    if(!start.ok){
-      var startText = await start.text();
-      throw new Error('YouTube started with an error (' + start.status + '). ' + startText.slice(0,180));
-    }
-    var location = start.headers.get('Location') || start.headers.get('location');
-    if(!location) throw new Error('YouTube did not return a resumable upload URL.');
-
-    var upload = await fetch(location,{
-      method:'PUT',
-      headers:{
-        Authorization:'Bearer ' + state.youtubeAccessToken,
-        'Content-Type':media.mime || 'application/octet-stream'
-      },
-      body:media.file
-    });
-    if(!upload.ok){
-      var uploadText = await upload.text();
-      throw new Error('YouTube upload failed (' + upload.status + '). ' + uploadText.slice(0,180));
-    }
-    return upload.json();
-  }
-
-  async function publishViaBackend(id){
-    if(!CONFIG.backendBaseUrl) throw new Error('Production backend is not configured.');
-    var data = new FormData();
-    data.append('media',state.media.file,state.media.fileName);
-    data.append('title',$('#postTitle').value || '');
-    data.append('caption',$('#postCaption').value || '');
-    data.append('platform',id);
-    var response = await fetch(CONFIG.backendBaseUrl.replace(/\/$/,'') + '/api/publish/' + encodeURIComponent(id),{
-      method:'POST',
-      credentials:'include',
-      body:data
-    });
-    if(!response.ok) throw new Error(platforms[id].name + ' backend returned ' + response.status + '.');
-    return response.json();
-  }
-
-  async function publishSelected(){
-    var selected = platformOrder.filter(function(id){ return !!state.selected[id]; });
-    if(!state.media || !selected.length) return;
-
-    var modal = $('#publishModal');
-    $('#publishTitle').textContent = 'Spreading your post…';
-    $('#publishDescription').textContent = 'Keep this tab open while connected platforms receive your media.';
-    $('#publishDoneButton').classList.add('hidden');
-    var list = $('#publishProgressList');
-    list.innerHTML = selected.map(function(id){
-      return '<div class="publish-progress-row" data-publish-row="' + id + '">' +
-        platformLogo(id) +
-        '<span class="progress-copy"><b>' + platforms[id].name + '</b><span>' + escapeHTML(state.accounts[id].name || 'Connected') + '</span></span>' +
-        '<span class="progress-state">Waiting</span>' +
-      '</div>';
-    }).join('');
-    openModal('publishModal');
-
-    var results = {};
-    for(var i=0;i<selected.length;i++){
-      var id = selected[i];
-      var row = $('[data-publish-row="' + id + '"]',list);
-      var status = $('.progress-state',row);
-      status.textContent = 'Publishing…';
-      try{
-        if(id === 'youtube' && state.youtubeAccessToken){
-          await uploadYouTube(state.media,$('#postTitle').value,$('#postCaption').value,$('#youtubePrivacy').value);
-        }else if(CONFIG.backendBaseUrl && !state.demoMode){
-          await publishViaBackend(id);
-        }else if(state.demoMode){
-          await sleep(650 + i * 160);
-        }else{
-          throw new Error('No production publisher is configured for ' + platforms[id].name + '.');
-        }
-        results[id] = 'published';
-        status.textContent = state.demoMode && !(id === 'youtube' && state.youtubeAccessToken) ? 'Demo published' : 'Published';
-        status.className = 'progress-state success';
-      }catch(error){
-        results[id] = 'failed';
-        status.textContent = 'Needs attention';
-        status.className = 'progress-state error';
-        $('.progress-copy span',row).textContent = error.message.slice(0,100);
+      setBusy(true);
+      var zip=new JSZip();
+      for(var i=0;i<items.length;i++){
+        $('#exportStatus').textContent='Processing '+(i+1)+' of '+items.length+'…';
+        var item=items[i];
+        var processed=await processItem(item);
+        var folder=targetFolder(item);
+        var path=(folder?safeFilePart(folder)+'/':'')+outputName(item,i);
+        zip.file(path,processed.blob);
       }
+      $('#exportStatus').textContent='Building ZIP…';
+      var archive=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+      downloadBlob(archive,'dropimage-export.zip');
+      toast('ZIP ready',items.length+' processed image'+(items.length===1?'':'s')+' downloaded.','success');
+    }catch(error){
+      console.error(error);
+      toast('ZIP export failed',error.message,'error');
+    }finally{
+      setBusy(false);
     }
-
-    var failed = selected.filter(function(id){ return results[id] === 'failed'; });
-    var record = {
-      id:Date.now(),
-      title:($('#postTitle').value || '').trim(),
-      fileName:state.media.fileName,
-      kind:state.media.kind,
-      platforms:selected,
-      results:results,
-      status:failed.length ? 'failed' : 'published',
-      when:new Date().toLocaleString()
-    };
-    state.history.unshift(record);
-    state.history = state.history.slice(0,100);
-    persist();
-    renderHome();
-    renderLibrary();
-    renderAnalytics();
-
-    if(failed.length){
-      $('#publishTitle').textContent = 'Finished with ' + failed.length + ' issue' + (failed.length === 1 ? '' : 's') + '.';
-      $('#publishDescription').textContent = 'Successful destinations are saved. Reconnect or retry destinations that need attention.';
-    }else{
-      $('#publishTitle').textContent = 'Spread complete.';
-      $('#publishDescription').textContent = 'Your publish result has been saved to the SocialTotal library.';
-    }
-    $('#publishDoneButton').classList.remove('hidden');
   }
 
-  function renderLibrary(filter){
-    filter = filter || ($('#libraryTabs .active') ? $('#libraryTabs .active').getAttribute('data-library-filter') : 'all');
-    var host = $('#libraryList');
-    if(!host) return;
-    var items = state.history.filter(function(item){
-      return filter === 'all' || item.status === filter;
-    });
-    if(!items.length){
-      host.innerHTML = '<div class="library-empty">' + (state.history.length ? 'No posts match this filter.' : 'Your publishing history will show up here after the first post.') + '</div>';
+  function setBusy(busy){
+    state.exporting=busy;
+    $('#exportZipButton').disabled=busy||!outputOrder().length;
+    $('#downloadCurrentButton').disabled=busy||!activeItem();
+    renderExportSummary();
+  }
+
+  function removeDuplicates(){
+    var before=state.items.length;
+    var idsToRemove=new Set(state.items.filter(function(item){return !!item.duplicateOf;}).map(function(item){return item.id;}));
+    if(!idsToRemove.size){
+      toast('No duplicates','Exact-file duplicate detection found nothing to remove.','info');
       return;
     }
-    host.innerHTML = items.map(function(item){
-      return '<article class="library-item">' +
-        '<span class="library-thumb">' + (item.kind === 'image' ? 'IMG' : 'VID') + '</span>' +
-        '<span class="library-copy"><b>' + escapeHTML(item.title || item.fileName || 'Untitled post') + '</b><span>' + escapeHTML(item.when) + ' · ' + (item.status === 'failed' ? 'Needs attention' : 'Published') + '</span></span>' +
-        '<span class="library-platforms">' + item.platforms.map(function(id){ return '<span title="' + platforms[id].name + '">' + platforms[id].short + '</span>'; }).join('') + '</span>' +
-      '</article>';
-    }).join('');
-  }
-
-  function renderAnalytics(){
-    var host = $('#platformBars');
-    if(!host) return;
-    var counts = {youtube:0,tiktok:0,instagram:0,facebook:0};
-    var destinations = 0;
-    state.history.forEach(function(item){
-      item.platforms.forEach(function(id){
-        if(typeof counts[id] === 'number') counts[id] += 1;
-        destinations += 1;
-      });
+    state.items=state.items.filter(function(item){
+      if(idsToRemove.has(item.id)){
+        URL.revokeObjectURL(item.url);
+        return false;
+      }
+      return true;
     });
-    $('#statPosts').textContent = state.history.length;
-    $('#statDestinations').textContent = destinations;
-    $('#statConnected').textContent = connectedCount();
-    var max = Math.max(1,counts.youtube,counts.tiktok,counts.instagram,counts.facebook);
-    host.innerHTML = platformOrder.map(function(id){
-      var percent = Math.round((counts[id] / max) * 100);
-      return '<div class="platform-bar-row"><span>' + platforms[id].name + '</span><div class="platform-bar-track"><div class="platform-bar-fill" style="width:' + percent + '%"></div></div><b>' + counts[id] + '</b></div>';
-    }).join('');
-  }
-
-  function renderBilling(){
-    $$('[data-plan-card]').forEach(function(card){
-      card.classList.toggle('current',card.getAttribute('data-plan-card') === state.plan);
-    });
-    $$('.plan-button').forEach(function(button){
-      var current = button.getAttribute('data-plan') === state.plan;
-      button.textContent = current ? 'Current plan' : button.getAttribute('data-plan') === 'free' ? 'Use Free' : button.getAttribute('data-plan') === 'spread' ? 'Choose Spread' : 'Choose Total';
-      button.disabled = current;
-    });
-  }
-
-  function setPlan(plan){
-    if(['free','spread','total'].indexOf(plan) === -1) return;
-    state.plan = plan;
-    if(plan === 'free'){
-      state.selected.instagram = false;
-      state.selected.facebook = false;
-    }
-    persist();
+    if(idsToRemove.has(state.activeId))state.activeId=state.items[0]?state.items[0].id:null;
+    recomputeDuplicates();
     renderAll();
-    toast(planLabel() + ' active','Demo plan changed locally. No payment was collected.','success');
+    toast('Duplicates removed',(before-state.items.length)+' duplicate'+((before-state.items.length)===1?'':'s')+' removed.','success');
   }
 
-  function updateAds(){
-    var show = state.plan !== 'total';
-    var slots = $('[data-ad-slot]');
-    slots.forEach(function(slot){ slot.classList.toggle('hidden',!show); });
-    if(!show || !CONFIG.adsenseClient || !CONFIG.adsenseSlot) return;
+  function clearAll(){
+    state.items.forEach(function(item){URL.revokeObjectURL(item.url);});
+    state.items=[];
+    state.activeId=null;
+    renderAll();
+    toast('Workspace cleared','Your local image list is empty.','info');
+  }
 
-    if(!document.querySelector('script[data-socialtotal-ads]')){
-      var script = document.createElement('script');
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.dataset.socialtotalAds = '1';
-      script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(CONFIG.adsenseClient);
+  function resetEdits(){
+    $('#formatSelect').value='original';
+    $('#qualityRange').value='88';
+    $('#maxWidthInput').value='';
+    $('#maxHeightInput').value='';
+    $('#paddingRange').value='0';
+    $('#radiusRange').value='0';
+    state.background='transparent';
+    state.rotation=0;
+    state.flipX=false;
+    $$('.swatch').forEach(function(button){button.classList.toggle('active',button.getAttribute('data-bg')==='transparent');});
+    updateSettingLabels();
+    renderOrganise();
+    toast('Edits reset','Batch processing settings returned to defaults.','info');
+  }
+
+  function updateSettingLabels(){
+    $('#qualityValue').textContent=$('#qualityRange').value+'%';
+    $('#paddingValue').textContent=$('#paddingRange').value+'px';
+    $('#radiusValue').textContent=$('#radiusRange').value+'px';
+  }
+
+  function initAds(){
+    var client=String(CONFIG.adsenseClient||'').trim();
+    if(!client)return;
+    if(!document.querySelector('script[data-dropimage-ads]')){
+      var script=document.createElement('script');
+      script.async=true;
+      script.crossOrigin='anonymous';
+      script.dataset.dropimageAds='1';
+      script.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client='+encodeURIComponent(client);
       document.head.appendChild(script);
     }
 
-    slots.forEach(function(slot){
-      if(slot.dataset.adInitialized === '1') return;
-      slot.dataset.adInitialized = '1';
-      slot.innerHTML = '';
-      var label = document.createElement('span');
-      label.className = 'ad-label';
-      label.textContent = 'Sponsored';
-      var ad = document.createElement('ins');
-      ad.className = 'adsbygoogle';
-      ad.setAttribute('data-ad-client',CONFIG.adsenseClient);
-      ad.setAttribute('data-ad-slot',CONFIG.adsenseSlot);
+    $$('[data-ad-key]').forEach(function(container){
+      var key=container.getAttribute('data-ad-key');
+      var slot=CONFIG.adSlots&&String(CONFIG.adSlots[key]||'').trim();
+      if(!slot)return;
+      container.innerHTML='<span class="ad-label">Advertisement</span>';
+      var ad=document.createElement('ins');
+      ad.className='adsbygoogle';
+      ad.style.display='block';
+      ad.setAttribute('data-ad-client',client);
+      ad.setAttribute('data-ad-slot',slot);
       ad.setAttribute('data-ad-format','auto');
       ad.setAttribute('data-full-width-responsive','true');
-      slot.appendChild(label);
-      slot.appendChild(ad);
-      try{
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      }catch(error){
-        console.warn('AdSense slot could not initialize',error);
-      }
+      container.appendChild(ad);
+      try{(window.adsbygoogle=window.adsbygoogle||[]).push({});}catch(error){console.warn('Ad slot could not initialise',key,error);}
     });
   }
 
-  function openModal(id){
-    var modal = $('#' + id);
-    if(!modal) return;
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden','false');
-  }
+  function bind(){
+    var dropZone=$('#dropZone');
+    var input=$('#fileInput');
 
-  function closeModal(id){
-    var modal = $('#' + id);
-    if(!modal) return;
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden','true');
-  }
-
-  function ensureLiquid(container){
-    if(!container || container.dataset.liquidReady) return;
-    container.dataset.liquidReady = '1';
-    var goo = document.createElement('span');
-    goo.className = 'liquid-goo';
-    goo.innerHTML = '<span class="liquid-bridge"></span><span class="liquid-blob"></span>';
-    var indicator = document.createElement('span');
-    indicator.className = 'liquid-indicator';
-    container.prepend(indicator);
-    container.prepend(goo);
-  }
-
-  function positionLiquid(container,active){
-    if(!container || !active) return;
-    ensureLiquid(container);
-    var indicator = $('.liquid-indicator',container);
-    var blob = $('.liquid-blob',container);
-    var containerRect = container.getBoundingClientRect();
-    var activeRect = active.getBoundingClientRect();
-    var x = activeRect.left - containerRect.left;
-    var width = activeRect.width;
-    indicator.style.width = width + 'px';
-    indicator.style.transform = 'translateX(' + x + 'px)';
-    blob.style.left = x + 'px';
-    blob.style.width = width + 'px';
-  }
-
-  function initLiquidTabs(){
-    $$('[data-liquid-tabs]').forEach(function(container){
-      ensureLiquid(container);
-      var buttons = $$('button',container);
-      buttons.forEach(function(button){
-        button.addEventListener('click',function(){
-          buttons.forEach(function(item){ item.classList.toggle('active',item === button); });
-          positionLiquid(container,button);
-          if(button.hasAttribute('data-library-filter')) renderLibrary(button.getAttribute('data-library-filter'));
-        });
-      });
-      requestAnimationFrame(function(){
-        positionLiquid(container,$('.active',container) || buttons[0]);
-      });
-    });
-    window.addEventListener('resize',function(){
-      $$('[data-liquid-tabs]').forEach(function(container){
-        positionLiquid(container,$('.active',container) || $('button',container));
-      });
-    });
-  }
-
-  function resetDemo(){
-    if(state.media && state.media.objectUrl) URL.revokeObjectURL(state.media.objectUrl);
-    localStorage.removeItem(STORAGE_KEY);
-    state.profile = null;
-    state.plan = 'free';
-    state.accounts = {
-      youtube:{connected:false,name:''},
-      tiktok:{connected:false,name:''},
-      instagram:{connected:false,name:''},
-      facebook:{connected:false,name:''}
-    };
-    state.history = [];
-    state.media = null;
-    state.selected = {};
-    state.youtubeAccessToken = null;
-    state.demoMode = CONFIG.demoMode !== false;
-    closeModal('settingsModal');
-    showView('auth');
-    resetComposer();
-    renderAll();
-    toast('Demo reset','Local SocialTotal data was cleared.','success');
-  }
-
-  function resetComposer(){
-    $('#mediaInput').value = '';
-    $('#dropEmpty').classList.remove('hidden');
-    $('#mediaPreview').classList.add('hidden');
-    $('#previewStage').innerHTML = '';
-    $('#postTitle').value = '';
-    $('#postCaption').value = '';
-    $('#captionCount').textContent = '0 / 2,200';
-    renderDestinations();
-  }
-
-  function bindEvents(){
-    $$('[data-route]').forEach(function(button){
-      button.addEventListener('click',function(){ routeTo(button.getAttribute('data-route')); });
-    });
-
-    $('#googleFallbackButton').addEventListener('click',function(){
-      if(CONFIG.googleClientId && window.google && google.accounts && google.accounts.id){
-        google.accounts.id.prompt();
-      }else{
-        demoLogin('Google','creator@gmail.demo');
-      }
-    });
-
-    $('#discordLoginButton').addEventListener('click',function(){
-      if(CONFIG.backendBaseUrl && CONFIG.discordClientId && !state.demoMode){
-        window.location.href = CONFIG.backendBaseUrl.replace(/\/$/,'') + '/auth/discord/start?return=' + encodeURIComponent(window.location.href);
-      }else{
-        demoLogin('Discord','creator@discord.demo');
-      }
-    });
-
-    $('#emailLoginForm').addEventListener('submit',function(event){
-      event.preventDefault();
-      var email = $('#emailInput').value.trim();
-      if(email) demoLogin('Email',email);
-    });
-
-    $('[data-connect]',$('#onboardingPlatforms')).forEach(function(card){
-      card.addEventListener('click',function(){ requestConnect(card.getAttribute('data-connect')); });
-    });
-
-    $('#skipOnboarding').addEventListener('click',enterApp);
-    $('#finishOnboarding').addEventListener('click',enterApp);
-    $('#quickConnectButton').addEventListener('click',function(){ routeTo('accounts'); });
-    $('#profileButton').addEventListener('click',function(){ openModal('settingsModal'); });
-    $('#settingsButton').addEventListener('click',function(){ openModal('settingsModal'); });
-
-    $('#permissionContinue').addEventListener('click',connectPendingPlatform);
-    $$('[data-close-modal]').forEach(function(button){
-      button.addEventListener('click',function(){ closeModal(button.getAttribute('data-close-modal')); });
-    });
-
-    $('#demoModeToggle').addEventListener('change',function(){
-      state.demoMode = $('#demoModeToggle').checked;
-      persist();
-      toast('Demo mode ' + (state.demoMode ? 'on' : 'off'),state.demoMode ? 'Unconfigured providers will be simulated.' : 'Unconfigured providers will be blocked.','info');
-    });
-    $('#resetDemoButton').addEventListener('click',resetDemo);
-
-    var dropZone = $('#dropZone');
-    var mediaInput = $('#mediaInput');
-    dropZone.addEventListener('click',function(event){
-      if(event.target.closest('#replaceMediaButton') || event.target.closest('video')) return;
-      mediaInput.click();
-    });
+    dropZone.addEventListener('click',function(){input.click();});
     dropZone.addEventListener('keydown',function(event){
-      if(event.key === 'Enter' || event.key === ' '){
-        event.preventDefault();
-        mediaInput.click();
-      }
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();input.click();}
     });
-    mediaInput.addEventListener('change',function(){ handleSelectedFile(mediaInput.files && mediaInput.files[0]); });
-    $('#replaceMediaButton').addEventListener('click',function(event){
-      event.stopPropagation();
-      mediaInput.click();
+    input.addEventListener('change',function(){
+      addFiles(input.files);
+      input.value='';
     });
-    ['dragenter','dragover'].forEach(function(name){
-      dropZone.addEventListener(name,function(event){
-        event.preventDefault();
-        dropZone.classList.add('dragging');
-      });
+    ['dragenter','dragover'].forEach(function(type){
+      dropZone.addEventListener(type,function(event){event.preventDefault();dropZone.classList.add('dragging');});
     });
-    ['dragleave','drop'].forEach(function(name){
-      dropZone.addEventListener(name,function(event){
-        event.preventDefault();
-        dropZone.classList.remove('dragging');
-      });
+    ['dragleave','drop'].forEach(function(type){
+      dropZone.addEventListener(type,function(event){event.preventDefault();dropZone.classList.remove('dragging');});
     });
     dropZone.addEventListener('drop',function(event){
-      var file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
-      if(file) handleSelectedFile(file);
+      if(event.dataTransfer&&event.dataTransfer.files)addFiles(event.dataTransfer.files);
     });
 
-    $('#postCaption').addEventListener('input',function(){
-      $('#captionCount').textContent = $('#postCaption').value.length.toLocaleString() + ' / 2,200';
+    $('#searchInput').addEventListener('input',renderLibrary);
+    $('#librarySort').addEventListener('change',renderLibrary);
+
+    $('#selectAllButton').addEventListener('click',function(){
+      var shouldSelect=selectedItems().length!==state.items.length;
+      state.items.forEach(function(item){item.selected=shouldSelect;});
+      renderAll();
     });
-    $('#selectAvailableButton').addEventListener('click',selectAvailable);
-    $('#publishButton').addEventListener('click',publishSelected);
-    $('#publishDoneButton').addEventListener('click',function(){
-      closeModal('publishModal');
-      routeTo('library');
+    $('#clearButton').addEventListener('click',clearAll);
+    $('#removeDuplicatesButton').addEventListener('click',removeDuplicates);
+
+    ['qualityRange','paddingRange','radiusRange'].forEach(function(id){
+      $('#'+id).addEventListener('input',function(){updateSettingLabels();renderOrganise();});
+    });
+    ['formatSelect','maxWidthInput','maxHeightInput'].forEach(function(id){
+      $('#'+id).addEventListener('change',function(){renderOrganise();renderExportSummary();});
     });
 
-    $$('.plan-button').forEach(function(button){
-      button.addEventListener('click',function(){ setPlan(button.getAttribute('data-plan')); });
-    });
-
-    document.addEventListener('keydown',function(event){
-      if(event.key !== 'Escape') return;
-      ['permissionModal','settingsModal'].forEach(function(id){
-        if(!$('#' + id).classList.contains('hidden')) closeModal(id);
+    $$('.swatch').forEach(function(button){
+      button.addEventListener('click',function(){
+        state.background=button.getAttribute('data-bg');
+        $$('.swatch').forEach(function(candidate){candidate.classList.toggle('active',candidate===button);});
       });
     });
+    $('#customColorInput').addEventListener('input',function(){
+      state.background=$('#customColorInput').value;
+      $$('.swatch').forEach(function(candidate){candidate.classList.remove('active');});
+    });
+
+    $$('[data-rotate]').forEach(function(button){
+      button.addEventListener('click',function(){
+        state.rotation=(state.rotation+parseInt(button.getAttribute('data-rotate'),10)+360)%360;
+        toast('Rotation set',state.rotation+'° will be applied during export.','info');
+      });
+    });
+    $('#flipXButton').addEventListener('click',function(){
+      state.flipX=!state.flipX;
+      $('#flipXButton').classList.toggle('active',state.flipX);
+      toast('Horizontal flip',state.flipX?'Enabled for export.':'Disabled.','info');
+    });
+    $('#resetEditsButton').addEventListener('click',resetEdits);
+
+    $('#renamePattern').addEventListener('input',function(){renderOrganise();renderExportSummary();});
+    $$('[data-token]').forEach(function(button){
+      button.addEventListener('click',function(){
+        var field=$('#renamePattern');
+        var token=button.getAttribute('data-token');
+        var start=field.selectionStart==null?field.value.length:field.selectionStart;
+        var end=field.selectionEnd==null?field.value.length:field.selectionEnd;
+        field.value=field.value.slice(0,start)+token+field.value.slice(end);
+        field.focus();
+        field.setSelectionRange(start+token.length,start+token.length);
+        renderOrganise();
+      });
+    });
+    $('#groupSelect').addEventListener('change',renderOrganise);
+    $('#exportSort').addEventListener('change',function(){renderOrganise();renderExportSummary();});
+    $('#selectedOnlyCheckbox').addEventListener('change',function(){renderOrganise();renderExportSummary();});
+
+    $('#downloadCurrentButton').addEventListener('click',downloadCurrent);
+    $('#exportZipButton').addEventListener('click',exportZip);
   }
 
   function init(){
-    loadState();
-    bindEvents();
-    initLiquidTabs();
-    initGoogleSignIn();
-    setupYouTubeTokenClient();
-    if(state.profile){
-      showView('app');
-      routeTo('home');
-    }else{
-      showView('auth');
-    }
+    bind();
+    updateSettingLabels();
     renderAll();
+    initAds();
   }
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded',init);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);
   else init();
 })();

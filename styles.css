@@ -1178,11 +1178,18 @@ input[type=range]::-moz-range-thumb{
 
 /* Reveal */
 .reveal{
+  opacity:1;
+  transform:none;
+}
+html.motion-ready .reveal{
   opacity:0;
   transform:translateY(24px);
   transition:opacity 520ms var(--ease),transform 650ms var(--ease);
 }
-.reveal.is-visible{opacity:1;transform:none}
+html.motion-ready .reveal.is-visible{
+  opacity:1;
+  transform:none;
+}
 
 /* Focus */
 :focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 48%,transparent);outline-offset:2px}

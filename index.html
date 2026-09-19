@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en" data-theme="socialtotal">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="SocialTotal — publish once, spread everywhere.">
+  <title>SocialTotal — Publish once. Spread everywhere.</title>
+  <link rel="preconnect" href="https://accounts.google.com">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" focusable="false" class="svg-defs">
+    <defs>
+      <filter id="liquidGoo">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"></feGaussianBlur>
+        <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 16 -8" result="goo"></feColorMatrix>
+        <feComposite in="SourceGraphic" in2="goo" operator="atop"></feComposite>
+      </filter>
+    </defs>
+  </svg>
+
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+  <section id="authView" class="auth-view">
+    <div class="auth-backdrop" aria-hidden="true">
+      <span class="orbit orbit-a"></span>
+      <span class="orbit orbit-b"></span>
+      <span class="orbit orbit-c"></span>
+    </div>
+
+    <div class="auth-shell">
+      <div class="auth-brand">
+        <div class="brand-mark brand-mark-large" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div>
+          <p class="brand-word">SocialTotal</p>
+          <p class="brand-sub">Publish once. Spread everywhere.</p>
+        </div>
+      </div>
+
+      <div class="auth-card">
+        <div class="auth-copy">
+          <span class="eyebrow">One upload · multiple platforms</span>
+          <h1>Your content, without the tab chaos.</h1>
+          <p>Upload once, see exactly where it fits, then publish to every connected account from one calm workspace.</p>
+        </div>
+
+        <div class="auth-actions">
+          <div id="googleButtonHost" class="google-button-host"></div>
+          <button id="googleFallbackButton" class="auth-provider" type="button">
+            <span class="provider-icon google-icon" aria-hidden="true">G</span>
+            <span>Continue with Google</span>
+          </button>
+
+          <button id="discordLoginButton" class="auth-provider" type="button">
+            <span class="provider-icon discord-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7.3 6.7c2.9-1.3 6.5-1.3 9.4 0 .7.9 1.3 2 1.7 3.1-.6-.4-1.3-.7-2-.9-.3.5-.6.9-.9 1.3-2.2-1-4.8-1-7 0-.3-.4-.6-.8-.9-1.3-.7.2-1.4.5-2 .9.4-1.1 1-2.2 1.7-3.1Z"/><path d="M5.1 10.6c-.2 2 .4 4 1.7 5.6 1.4 1 2.9 1.7 4.5 2.1l.9-1.3c-1-.3-1.9-.7-2.7-1.3l.6-.4c1.2.5 2.5.8 3.8.8s2.6-.3 3.8-.8l.6.4c-.8.6-1.7 1-2.7 1.3l.9 1.3c1.6-.4 3.1-1.1 4.5-2.1 1.3-1.6 1.9-3.6 1.7-5.6-1.2-1-2.5-1.7-4-2.1-.5.7-.9 1.5-1.2 2.3-2.3-.7-4.7-.7-7 0-.3-.8-.7-1.6-1.2-2.3-1.5.4-2.8 1.1-4 2.1Zm4.8 3.4c-.8 0-1.4-.7-1.4-1.6s.6-1.6 1.4-1.6 1.4.7 1.4 1.6-.6 1.6-1.4 1.6Zm4.2 0c-.8 0-1.4-.7-1.4-1.6s.6-1.6 1.4-1.6 1.4.7 1.4 1.6-.6 1.6-1.4 1.6Z"/></svg>
+            </span>
+            <span>Continue with Discord</span>
+          </button>
+
+          <div class="or-row"><span></span><b>or</b><span></span></div>
+
+          <form id="emailLoginForm" class="email-login">
+            <label for="emailInput">Email</label>
+            <div class="email-row">
+              <input id="emailInput" type="email" autocomplete="email" placeholder="you@example.com" required>
+              <button class="button button-primary" type="submit">Continue</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="auth-footnote">Demo build. SocialTotal never asks you to paste social passwords. Connections use each platform's own permission flow.</p>
+      </div>
+
+      <div class="auth-preview-strip" aria-label="Supported platforms">
+        <span class="mini-platform youtube">YT</span>
+        <span class="mini-platform tiktok">TT</span>
+        <span class="mini-platform instagram">IG</span>
+        <span class="mini-platform facebook">FB</span>
+        <span class="preview-text">Free starts with YouTube + TikTok.</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="onboardingView" class="onboarding-view hidden" aria-hidden="true">
+    <div class="onboarding-shell">
+      <header class="onboarding-head">
+        <div class="brand-inline">
+          <div class="brand-mark"><span></span><span></span><span></span><span></span></div>
+          <strong>SocialTotal</strong>
+        </div>
+        <button id="skipOnboarding" class="text-button" type="button">Skip for now</button>
+      </header>
+
+      <div class="onboarding-copy">
+        <span class="eyebrow">Step 1 of 1</span>
+        <h2>Connect where you publish.</h2>
+        <p>You can change these anytime. SocialTotal only asks for the permissions needed to identify your account and publish content you explicitly send.</p>
+      </div>
+
+      <div id="onboardingPlatforms" class="connect-grid">
+        <button class="connect-card" data-connect="youtube" type="button">
+          <span class="platform-logo youtube">YT</span>
+          <span class="connect-card-copy"><b>YouTube</b><small>Upload videos to your channel</small></span>
+          <span class="connect-action">Connect</span>
+        </button>
+        <button class="connect-card" data-connect="tiktok" type="button">
+          <span class="platform-logo tiktok">TT</span>
+          <span class="connect-card-copy"><b>TikTok</b><small>Post videos and supported photos</small></span>
+          <span class="connect-action">Connect</span>
+        </button>
+        <button class="connect-card locked-plan" data-connect="instagram" type="button">
+          <span class="platform-logo instagram">IG</span>
+          <span class="connect-card-copy"><b>Instagram</b><small>Business / Creator publishing</small></span>
+          <span class="plan-chip">$1+</span>
+        </button>
+        <button class="connect-card locked-plan" data-connect="facebook" type="button">
+          <span class="platform-logo facebook">FB</span>
+          <span class="connect-card-copy"><b>Facebook</b><small>Publish to connected Pages</small></span>
+          <span class="plan-chip">$1+</span>
+        </button>
+      </div>
+
+      <div class="onboarding-bottom">
+        <span id="onboardingStatus">0 accounts connected</span>
+        <button id="finishOnboarding" class="button button-primary" type="button">Open SocialTotal</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="appView" class="app-view hidden" aria-hidden="true">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark"><span></span><span></span><span></span><span></span></div>
+        <div class="sidebar-brand-copy">
+          <strong>SocialTotal</strong>
+          <span id="planBadge">Free</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Primary">
+        <button class="nav-item active" data-route="home" type="button">
+          <svg viewBox="0 0 24 24"><path d="M4 10.8 12 4l8 6.8v8.4a.8.8 0 0 1-.8.8h-4.4v-6h-5.6v6H4.8a.8.8 0 0 1-.8-.8v-8.4Z"/></svg>
+          <span>Home</span>
+        </button>
+        <button class="nav-item" data-route="create" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Create</span>
+        </button>
+        <button class="nav-item" data-route="library" type="button">
+          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m9 15 2.4-2.5a1 1 0 0 1 1.4-.1L16 15.5M8.2 9.2h.01"/></svg>
+          <span>Library</span>
+        </button>
+        <button class="nav-item" data-route="accounts" type="button">
+          <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 19c.6-3.2 2.1-5 4.5-5s3.9 1.8 4.5 5M14 18.5c.4-2.3 1.5-3.6 3.2-3.6 1.8 0 2.9 1.3 3.3 3.6"/></svg>
+          <span>Accounts</span>
+        </button>
+        <button class="nav-item" data-route="analytics" type="button">
+          <svg viewBox="0 0 24 24"><path d="M5 19V9M12 19V5M19 19v-7"/></svg>
+          <span>Analytics</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <button class="nav-item" data-route="billing" type="button">
+          <svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="3"/><path d="M4 10h16M8 14h3"/></svg>
+          <span>Billing</span>
+        </button>
+        <button id="settingsButton" class="nav-item" type="button">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.7-.7L10.5 2h-3l-.7 2a7 7 0 0 0-1.7.7l-1.9-.9L1.1 5.9 2 7.8a7 7 0 0 0-.7 1.7L0 10.5v3l2 .7c.2.6.4 1.2.7 1.7l-.9 1.9 2.1 2.1 1.9-.9c.5.3 1.1.5 1.7.7l.7 2.3h3l.7-2c.6-.2 1.2-.4 1.7-.7l1.9.9 2.1-2.1-.9-1.9c.3-.5.5-1.1.7-1.7l2.6-1Z"/></svg>
+          <span>Settings</span>
+        </button>
+        <button id="profileButton" class="profile-button" type="button">
+          <span id="profileAvatar" class="profile-avatar">P</span>
+          <span class="profile-copy"><b id="profileName">Demo creator</b><small id="profileEmail">demo@socialtotal.app</small></span>
+          <span class="chevron">⌄</span>
+        </button>
+      </div>
+    </aside>
+
+    <main class="app-main">
+      <header class="topbar">
+        <div class="mobile-brand">
+          <div class="brand-mark"><span></span><span></span><span></span><span></span></div>
+          <strong>SocialTotal</strong>
+        </div>
+        <div class="topbar-status">
+          <span class="status-dot"></span>
+          <span id="connectedSummary">0 connected</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="quickConnectButton" class="icon-button" type="button" aria-label="Connect account" title="Connect account">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="button button-primary top-create" data-route="create" type="button">New post</button>
+        </div>
+      </header>
+
+      <div class="route-stack">
+        <section class="route active" data-page="home">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">Overview</span>
+              <h1 id="homeGreeting">Good to see you.</h1>
+              <p>One workspace for every post worth spreading.</p>
+            </div>
+            <button class="button button-primary" data-route="create" type="button">Create a post</button>
+          </div>
+
+          <div class="hero-panel">
+            <div class="hero-panel-copy">
+              <span class="hero-label">Ready when you are</span>
+              <h2>Drop it once.<br><span>SocialTotal handles the rest.</span></h2>
+              <p>Real media detection checks your file before you publish, so incompatible destinations are disabled before they become errors.</p>
+              <button class="button button-light" data-route="create" type="button">Choose media</button>
+            </div>
+            <div class="spread-visual" aria-hidden="true">
+              <div class="spread-center">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              </div>
+              <span class="spread-node n1">YT</span>
+              <span class="spread-node n2">TT</span>
+              <span class="spread-node n3">IG</span>
+              <span class="spread-node n4">FB</span>
+              <span class="spread-line l1"></span><span class="spread-line l2"></span><span class="spread-line l3"></span><span class="spread-line l4"></span>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <article class="panel connection-panel">
+              <div class="panel-head">
+                <div><span class="panel-kicker">Accounts</span><h3>Your destinations</h3></div>
+                <button class="text-button" data-route="accounts" type="button">Manage</button>
+              </div>
+              <div id="homeAccountList" class="home-account-list"></div>
+            </article>
+
+            <article class="panel activity-panel">
+              <div class="panel-head">
+                <div><span class="panel-kicker">Recent</span><h3>Publishing activity</h3></div>
+                <button class="text-button" data-route="library" type="button">View library</button>
+              </div>
+              <div id="recentActivity" class="empty-state compact">
+                <div class="empty-icon">↗</div>
+                <b>Nothing published yet</b>
+                <p>Your first SocialTotal post will appear here.</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="ad-slot" data-ad-slot>
+            <span class="ad-label">Sponsored</span>
+            <div class="ad-demo-copy">
+              <b>Ad space</b>
+              <span>Demo placement · hidden automatically on Total</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="route" data-page="create">
+          <div class="page-head create-head">
+            <div>
+              <span class="eyebrow">Create</span>
+              <h1>Spread a post.</h1>
+              <p>SocialTotal detects the media first, then lets you choose only compatible destinations.</p>
+            </div>
+            <span id="draftState" class="save-state">Draft saved locally</span>
+          </div>
+
+          <div class="composer-layout">
+            <div class="composer-main">
+              <article class="panel upload-panel">
+                <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose or drop media">
+                  <input id="mediaInput" type="file" accept="video/*,image/*" hidden>
+                  <div id="dropEmpty" class="drop-empty">
+                    <div class="upload-glyph">
+                      <svg viewBox="0 0 24 24"><path d="M12 16V5M8 9l4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>
+                    </div>
+                    <h3>Drop a video or image</h3>
+                    <p>or click to choose from your device</p>
+                    <span>MP4, MOV, WebM, JPG, PNG, WebP and browser-readable media</span>
+                  </div>
+                  <div id="mediaPreview" class="media-preview hidden">
+                    <div id="previewStage" class="preview-stage"></div>
+                    <div class="preview-details">
+                      <div class="preview-title-row">
+                        <div><b id="fileName">media</b><span id="fileSize">0 MB</span></div>
+                        <button id="replaceMediaButton" class="small-button" type="button">Replace</button>
+                      </div>
+                      <div class="media-facts">
+                        <span><b>Type</b><em id="mediaTypeFact">—</em></span>
+                        <span><b>Size</b><em id="dimensionsFact">—</em></span>
+                        <span><b>Ratio</b><em id="ratioFact">—</em></span>
+                        <span><b>Length</b><em id="durationFact">—</em></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="panel copy-panel">
+                <div class="panel-head">
+                  <div><span class="panel-kicker">Post details</span><h3>One caption, tailored destinations.</h3></div>
+                </div>
+                <label class="field-label" for="postTitle">Title</label>
+                <input id="postTitle" class="text-input" type="text" maxlength="100" placeholder="Give your post a title">
+                <div class="field-row">
+                  <label class="field-label" for="postCaption">Caption</label>
+                  <span id="captionCount">0 / 2,200</span>
+                </div>
+                <textarea id="postCaption" class="text-area" maxlength="2200" rows="6" placeholder="Write once. SocialTotal keeps your caption with the post."></textarea>
+
+                <div class="privacy-row">
+                  <div>
+                    <b>Visibility</b>
+                    <span>YouTube visibility for direct demo uploads.</span>
+                  </div>
+                  <select id="youtubePrivacy" class="select-control">
+                    <option value="private">Private</option>
+                    <option value="unlisted">Unlisted</option>
+                    <option value="public">Public</option>
+                  </select>
+                </div>
+              </article>
+            </div>
+
+            <aside class="composer-side">
+              <article class="panel destinations-panel">
+                <div class="panel-head">
+                  <div><span class="panel-kicker">Destinations</span><h3>Where this fits</h3></div>
+                  <button id="selectAvailableButton" class="text-button" type="button">Select available</button>
+                </div>
+                <div id="destinationList" class="destination-list"></div>
+                <div id="detectionNote" class="detection-note">
+                  <span class="detect-dot"></span>
+                  <p>Choose media to run compatibility detection.</p>
+                </div>
+              </article>
+
+              <article class="panel publish-panel">
+                <div class="publish-summary">
+                  <span>Selected</span>
+                  <strong id="selectedCount">0 platforms</strong>
+                </div>
+                <button id="publishButton" class="button button-primary button-full" type="button" disabled>Publish everywhere</button>
+                <p id="publishHint">Connect an account and choose compatible media first.</p>
+              </article>
+
+              <div class="ad-slot compact-ad" data-ad-slot>
+                <span class="ad-label">Sponsored</span>
+                <div class="ad-demo-copy"><b>Ad space</b><span>Visible on Free + Spread</span></div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="route" data-page="library">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">Library</span>
+              <h1>Your spread history.</h1>
+              <p>Every publish attempt stays readable instead of becoming a mystery log.</p>
+            </div>
+          </div>
+          <div class="segmented" id="libraryTabs" data-liquid-tabs>
+            <button class="active" data-library-filter="all" type="button">All</button>
+            <button data-library-filter="published" type="button">Published</button>
+            <button data-library-filter="failed" type="button">Needs attention</button>
+          </div>
+          <div id="libraryList" class="library-list"></div>
+        </section>
+
+        <section class="route" data-page="accounts">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">Accounts</span>
+              <h1>Your publishing network.</h1>
+              <p>Connect providers through their own permission screens. SocialTotal never needs your social passwords.</p>
+            </div>
+          </div>
+          <div id="accountsGrid" class="accounts-grid"></div>
+          <div class="security-note">
+            <svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.4 2.7 8.1 7 10 4.3-1.9 7-5.6 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+            <div><b>Provider-native permissions</b><span>Real YouTube connection uses Google Identity Services. Production TikTok / Meta tokens belong on a private backend, never in this frontend.</span></div>
+          </div>
+        </section>
+
+        <section class="route" data-page="analytics">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">Analytics</span>
+              <h1>Simple, useful numbers.</h1>
+              <p>The demo tracks your local SocialTotal publishing activity. Provider analytics can be added after production API connections.</p>
+            </div>
+          </div>
+          <div class="stat-grid">
+            <article class="stat-card"><span>Total posts</span><strong id="statPosts">0</strong><small>from this browser</small></article>
+            <article class="stat-card"><span>Destinations</span><strong id="statDestinations">0</strong><small>publish attempts</small></article>
+            <article class="stat-card"><span>Connected</span><strong id="statConnected">0</strong><small>social accounts</small></article>
+          </div>
+          <article class="panel analytics-panel">
+            <div class="panel-head"><div><span class="panel-kicker">Distribution</span><h3>Posts by platform</h3></div></div>
+            <div id="platformBars" class="platform-bars"></div>
+          </article>
+        </section>
+
+        <section class="route" data-page="billing">
+          <div class="page-head billing-head">
+            <div>
+              <span class="eyebrow">Plans</span>
+              <h1>Pay for reach, not clutter.</h1>
+              <p>Demo billing lets you switch plans locally so you can test every gate before adding a real payment provider.</p>
+            </div>
+          </div>
+
+          <div class="pricing-grid">
+            <article class="price-card" data-plan-card="free">
+              <div class="price-top"><span>Free</span><b>For trying it</b></div>
+              <div class="price"><strong>$0</strong><span>/ month</span></div>
+              <ul>
+                <li>YouTube + TikTok</li>
+                <li>Real media detection</li>
+                <li>Publishing history</li>
+                <li>Ads included</li>
+              </ul>
+              <button class="button button-secondary button-full plan-button" data-plan="free" type="button">Use Free</button>
+            </article>
+
+            <article class="price-card featured" data-plan-card="spread">
+              <div class="price-top"><span>Spread</span><b>All platforms</b></div>
+              <div class="price"><strong>$1</strong><span>/ month</span></div>
+              <ul>
+                <li>YouTube + TikTok</li>
+                <li>Instagram + Facebook</li>
+                <li>All compatibility tools</li>
+                <li>Ads included</li>
+              </ul>
+              <button class="button button-primary button-full plan-button" data-plan="spread" type="button">Choose Spread</button>
+            </article>
+
+            <article class="price-card" data-plan-card="total">
+              <div class="price-top"><span>Total</span><b>Cleanest experience</b></div>
+              <div class="price"><strong>$2</strong><span>/ month</span></div>
+              <ul>
+                <li>Everything in Spread</li>
+                <li>No advertisements</li>
+                <li>Priority publishing queue ready</li>
+                <li>Future premium tools</li>
+              </ul>
+              <button class="button button-secondary button-full plan-button" data-plan="total" type="button">Choose Total</button>
+            </article>
+          </div>
+
+          <div class="demo-billing-note">
+            <span>Demo billing</span>
+            <p>These buttons only change local demo state. No card is charged and no payment information is collected.</p>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <nav class="mobile-tabs" aria-label="Mobile primary">
+      <button class="mobile-tab active" data-route="home" type="button"><svg viewBox="0 0 24 24"><path d="M4 10.8 12 4l8 6.8v8.4a.8.8 0 0 1-.8.8h-4.4v-6h-5.6v6H4.8a.8.8 0 0 1-.8-.8v-8.4Z"/></svg><span>Home</span></button>
+      <button class="mobile-tab" data-route="create" type="button"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Create</span></button>
+      <button class="mobile-tab" data-route="library" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m9 15 2.4-2.5a1 1 0 0 1 1.4-.1L16 15.5"/></svg><span>Library</span></button>
+      <button class="mobile-tab" data-route="accounts" type="button"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3.5 19c.6-3.2 2.1-5 4.5-5s3.9 1.8 4.5 5"/></svg><span>Accounts</span></button>
+    </nav>
+  </div>
+
+  <div id="permissionModal" class="modal hidden" aria-hidden="true">
+    <button class="modal-backdrop" data-close-modal="permissionModal" aria-label="Close permission dialog" type="button"></button>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="permissionTitle">
+      <div id="permissionLogo" class="platform-logo">ST</div>
+      <span class="modal-kicker">Connect account</span>
+      <h2 id="permissionTitle">Connect platform</h2>
+      <p id="permissionDescription">SocialTotal will open the provider's own permission flow.</p>
+      <div id="permissionList" class="permission-list"></div>
+      <div id="permissionDemoWarning" class="demo-warning hidden">
+        <b>Demo connection</b>
+        <span>This provider is not configured with a production backend yet. The connection will be simulated locally.</span>
+      </div>
+      <div class="modal-actions">
+        <button class="button button-secondary" data-close-modal="permissionModal" type="button">Cancel</button>
+        <button id="permissionContinue" class="button button-primary" type="button">Continue to provider</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="publishModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop static"></div>
+    <div class="modal-card publish-progress-card" role="dialog" aria-modal="true" aria-labelledby="publishTitle">
+      <span class="modal-kicker">Publishing</span>
+      <h2 id="publishTitle">Spreading your post…</h2>
+      <p id="publishDescription">Keep this tab open while connected platforms receive your media.</p>
+      <div id="publishProgressList" class="publish-progress-list"></div>
+      <button id="publishDoneButton" class="button button-primary button-full hidden" type="button">Done</button>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal hidden" aria-hidden="true">
+    <button class="modal-backdrop" data-close-modal="settingsModal" aria-label="Close settings" type="button"></button>
+    <div class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <span class="modal-kicker">Settings</span>
+      <h2 id="settingsTitle">SocialTotal settings</h2>
+      <div class="setting-row">
+        <div><b>Demo mode</b><span>Simulate providers without configured credentials.</span></div>
+        <label class="switch"><input id="demoModeToggle" type="checkbox"><span></span></label>
+      </div>
+      <div class="setting-row">
+        <div><b>Reset demo data</b><span>Clears local profile, plan, accounts and history.</span></div>
+        <button id="resetDemoButton" class="small-button danger" type="button">Reset</button>
+      </div>
+      <div class="settings-links">
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

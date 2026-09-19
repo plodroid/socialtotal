@@ -1,5 +1,6 @@
 window.DROPIMAGE_CONFIG = {
   adsenseClient: "",
+  autoAds: true,
   adSlots: {
     top: "",
     left: "",

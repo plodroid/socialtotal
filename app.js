@@ -773,6 +773,43 @@
       if(event.dataTransfer&&event.dataTransfer.files)addFiles(event.dataTransfer.files);
     });
 
+    document.addEventListener('paste',function(event){
+      var clipboard=event.clipboardData;
+      if(!clipboard||!clipboard.items)return;
+
+      var imageFiles=[];
+      Array.from(clipboard.items).forEach(function(item,index){
+        if(item.kind!=='file'||item.type.indexOf('image/')!==0)return;
+        var file=item.getAsFile();
+        if(!file)return;
+
+        if(!file.name||file.name==='image.png'){
+          var ext=extensionForMime(file.type||'image/png');
+          try{
+            file=new File(
+              [file],
+              'pasted-image-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+(index+1)+'.'+ext,
+              {type:file.type||'image/png',lastModified:Date.now()}
+            );
+          }catch(error){
+            // Older browsers can still use the original clipboard File.
+          }
+        }
+        imageFiles.push(file);
+      });
+
+      if(!imageFiles.length)return;
+      event.preventDefault();
+      dropZone.classList.add('dragging');
+      setTimeout(function(){dropZone.classList.remove('dragging');},240);
+      addFiles(imageFiles);
+      toast(
+        'Pasted from clipboard',
+        imageFiles.length+' image'+(imageFiles.length===1?'':'s')+' added to your workspace.',
+        'success'
+      );
+    });
+
     $('#searchInput').addEventListener('input',renderLibrary);
     $('#librarySort').addEventListener('change',renderLibrary);
 

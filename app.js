@@ -305,7 +305,7 @@
   }
 
   function renderOnboarding(){
-    $$('[data-connect]','#onboardingPlatforms').forEach(function(card){
+    $('[data-connect]',$('#onboardingPlatforms')).forEach(function(card){
       var id = card.getAttribute('data-connect');
       var connected = state.accounts[id].connected;
       card.classList.toggle('connected',connected);
@@ -810,8 +810,10 @@
           await uploadYouTube(state.media,$('#postTitle').value,$('#postCaption').value,$('#youtubePrivacy').value);
         }else if(CONFIG.backendBaseUrl && !state.demoMode){
           await publishViaBackend(id);
-        }else{
+        }else if(state.demoMode){
           await sleep(650 + i * 160);
+        }else{
+          throw new Error('No production publisher is configured for ' + platforms[id].name + '.');
         }
         results[id] = 'published';
         status.textContent = state.demoMode && !(id === 'youtube' && state.youtubeAccessToken) ? 'Demo published' : 'Published';
@@ -918,8 +920,11 @@
 
   function updateAds(){
     var show = state.plan !== 'total';
-    $$('[data-ad-slot]').forEach(function(slot){ slot.classList.toggle('hidden',!show); });
-    if(show && CONFIG.adsenseClient && CONFIG.adsenseSlot && !document.querySelector('script[data-socialtotal-ads]')){
+    var slots = $('[data-ad-slot]');
+    slots.forEach(function(slot){ slot.classList.toggle('hidden',!show); });
+    if(!show || !CONFIG.adsenseClient || !CONFIG.adsenseSlot) return;
+
+    if(!document.querySelector('script[data-socialtotal-ads]')){
       var script = document.createElement('script');
       script.async = true;
       script.crossOrigin = 'anonymous';
@@ -927,6 +932,28 @@
       script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(CONFIG.adsenseClient);
       document.head.appendChild(script);
     }
+
+    slots.forEach(function(slot){
+      if(slot.dataset.adInitialized === '1') return;
+      slot.dataset.adInitialized = '1';
+      slot.innerHTML = '';
+      var label = document.createElement('span');
+      label.className = 'ad-label';
+      label.textContent = 'Sponsored';
+      var ad = document.createElement('ins');
+      ad.className = 'adsbygoogle';
+      ad.setAttribute('data-ad-client',CONFIG.adsenseClient);
+      ad.setAttribute('data-ad-slot',CONFIG.adsenseSlot);
+      ad.setAttribute('data-ad-format','auto');
+      ad.setAttribute('data-full-width-responsive','true');
+      slot.appendChild(label);
+      slot.appendChild(ad);
+      try{
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      }catch(error){
+        console.warn('AdSense slot could not initialize',error);
+      }
+    });
   }
 
   function openModal(id){
@@ -1053,7 +1080,7 @@
       if(email) demoLogin('Email',email);
     });
 
-    $$('[data-connect]','#onboardingPlatforms').forEach(function(card){
+    $('[data-connect]',$('#onboardingPlatforms')).forEach(function(card){
       card.addEventListener('click',function(){ requestConnect(card.getAttribute('data-connect')); });
     });
 

@@ -1,52 +1,19 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#07111f">
-  <title>Privacy — SocialTotal</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#07111f"><title>Privacy — DropImage</title>
   <link rel="stylesheet" href="styles.css">
   <style>
-    .legal{width:min(780px,calc(100% - 32px));margin:0 auto;padding:64px 0 100px}
-    .legal-brand{display:flex;align-items:center;gap:11px;margin-bottom:68px}
-    .legal h1{margin:0;font-size:clamp(3.5rem,10vw,7rem);line-height:.88;letter-spacing:-.075em}
-    .legal .lead{margin:20px 0 48px;color:var(--muted);font-size:1rem;line-height:1.7}
-    .legal section{padding:28px 0;border-top:1px solid var(--line)}
-    .legal h2{margin:0 0 12px;font-size:1.25rem;letter-spacing:-.04em}
-    .legal p,.legal li{color:var(--muted);font-size:.86rem;line-height:1.7}
-    .legal a{color:#9bb7ff}
+    .legal{width:min(760px,calc(100% - 32px));margin:auto;padding:60px 0 100px}.legal-brand{display:flex;align-items:center;gap:10px;margin-bottom:70px}.legal h1{margin:0;font-size:clamp(3.4rem,10vw,7rem);line-height:.88;letter-spacing:-.075em}.legal .lead{margin:20px 0 45px;color:var(--muted);line-height:1.7}.legal section{padding:26px 0;border-top:1px solid var(--line)}.legal h2{margin:0 0 10px;font-size:1.15rem;letter-spacing:-.035em}.legal p{color:var(--muted);font-size:.82rem;line-height:1.7}
   </style>
 </head>
-<body>
-  <main class="legal">
-    <a class="legal-brand" href="index.html">
-      <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
-      <strong>SocialTotal</strong>
-    </a>
-    <span class="eyebrow">Demo policy</span>
-    <h1>Privacy without weirdness.</h1>
-    <p class="lead">This repository currently contains a browser demo. This page describes the demo behavior and must be expanded before a public production launch.</p>
-
-    <section>
-      <h2>Local demo data</h2>
-      <p>Demo profile details, plan selection, connected-state labels, and publishing history are stored in your browser using localStorage. Uploaded media files are not persisted by this demo after the page session.</p>
-    </section>
-    <section>
-      <h2>Google and YouTube</h2>
-      <p>If a Google OAuth client ID is configured, Google Identity Services handles Google sign-in and YouTube authorization. SocialTotal requests YouTube scopes only to identify the connected channel and upload videos the user explicitly chooses. Short-lived access tokens are kept in memory by this frontend demo and are not written to localStorage.</p>
-    </section>
-    <section>
-      <h2>Other platforms</h2>
-      <p>TikTok, Instagram, Facebook, Discord, payments, and durable authentication require a production backend. The default demo simulates these connections locally instead of collecting real passwords or secret tokens.</p>
-    </section>
-    <section>
-      <h2>Advertising</h2>
-      <p>The demo contains advertising placements for Free and Spread plans. A real advertising provider may collect information under its own policies once configured. Total plan UI hides SocialTotal ad placements.</p>
-    </section>
-    <section>
-      <h2>Before production</h2>
-      <p>Add your business identity, contact method, retention periods, deletion workflow, provider-specific disclosures, cookie/consent behavior, and any legally required regional terms before inviting real users.</p>
-    </section>
-  </main>
-</body>
-</html>
+<body><main class="legal">
+  <a class="legal-brand" href="index.html"><span class="brand-mark"><i></i><i></i><i></i></span><strong>DropImage</strong></a>
+  <span class="eyebrow">Privacy</span><h1>Your images stay local.</h1>
+  <p class="lead">DropImage is designed to process images in your browser instead of sending image contents to an application server.</p>
+  <section><h2>Image processing</h2><p>Selected files are read locally to create previews, dimensions, duplicate hashes, processed images and ZIP exports. Temporary object URLs exist only in your browser session and are released when files are removed or the page closes.</p></section>
+  <section><h2>Metadata</h2><p>Processed exports are redrawn through the browser Canvas API. This typically removes common embedded EXIF and application metadata. DropImage does not claim to be a forensic metadata-removal tool.</p></section>
+  <section><h2>Third-party resources</h2><p>The site loads JSZip from jsDelivr for ZIP creation. If advertising is configured, the advertising provider may process identifiers, cookies or usage information under its own policies.</p></section>
+  <section><h2>Advertising</h2><p>DropImage contains clearly-labelled advertising areas. The operator must configure any required consent tools and maintain this notice to match the ad products and regions actually used.</p></section>
+</main></body></html>

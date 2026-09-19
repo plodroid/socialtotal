@@ -13,11 +13,12 @@ DropImage already contains six ad placements:
 - `inline2` — between organisation and export
 - `footer` — wide billboard near the footer
 
-After your Google AdSense site/account is approved, create responsive display ad units and add the public IDs to `config.js`:
+After your Google AdSense site/account is approved, the lowest-setup option is **Auto Ads**: enable Auto Ads for the site in AdSense and add only your public publisher ID to `config.js`. DropImage already loads the AdSense script; Google can choose placements automatically.\n\nIf you want DropImage's six fixed ad surfaces as well, create responsive display ad units and add their public slot IDs:
 
 ```js
 window.DROPIMAGE_CONFIG = {
   adsenseClient: "ca-pub-YOUR_PUBLISHER_ID",
+  autoAds: true,
   adSlots: {
     top: "YOUR_TOP_SLOT",
     left: "YOUR_LEFT_SLOT",

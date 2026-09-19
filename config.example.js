@@ -1,9 +1,11 @@
-window.SOCIALTOTAL_CONFIG = {
-  googleClientId: "",
-  tiktokClientKey: "",
-  backendBaseUrl: "",
-  discordClientId: "",
+window.DROPIMAGE_CONFIG = {
   adsenseClient: "",
-  adsenseSlot: "",
-  demoMode: true
+  adSlots: {
+    top: "",
+    left: "",
+    right: "",
+    inline1: "",
+    inline2: "",
+    footer: ""
+  }
 };
